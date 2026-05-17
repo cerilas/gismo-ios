@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleDisplayName</key>
+	<string>Gismo</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>Gismo</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.312777580050-0od6id68t7gh274aveien553acopmrsr</string>
+			</array>
+		</dict>
+	</array>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>GIDClientID</key>
+	<string>312777580050-0od6id68t7gh274aveien553acopmrsr.apps.googleusercontent.com</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_http._tcp</string>
+	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Gismo fotoğraf çekebilmek için kameraya ihtiyaç duyuyor.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Gismo robota yerel ağ üzerinden bağlanmak için gereklidir.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Gismo seninle konuşabilmek için mikrofona ihtiyaç duyuyor.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Gismo çektiği fotoğrafı galerine kaydetmek için izin istiyor.</string>
+	<key>NSContactsUsageDescription</key>
+	<string>Gismo'nun söylediğiniz kişilere doğrudan SMS atabilmesi için rehberinize erişmesi gerekiyor.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Gismo seni dinleyebilmek için konuşma tanıma iznine ihtiyaç duyuyor.</string>
+	<key>UILaunchStoryboardName</key>
+	<string></string>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+	</array>
+	<key>UIUserInterfaceStyle</key>
+	<string>Dark</string>
+</dict>
+</plist>

@@ -1,0 +1,57 @@
+name: GismoApp
+options:
+  bundleIdPrefix: com.gismo
+  deploymentTarget:
+    iOS: "16.0"
+  xcodeVersion: "15.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+
+packages:
+  GoogleSignIn:
+    url: https://github.com/google/GoogleSignIn-iOS
+    from: 7.1.0
+
+targets:
+  GismoApp:
+    type: application
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - path: GismoApp
+        excludes:
+          - "gismo-app-backend/**"
+    dependencies:
+      - package: GoogleSignIn
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.gismo.app
+        SWIFT_VERSION: 5.9
+        TARGETED_DEVICE_FAMILY: "1,2"
+        MARKETING_VERSION: "1.0.0"
+        CURRENT_PROJECT_VERSION: "1"
+        INFOPLIST_FILE: GismoApp/Info.plist
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        ENABLE_PREVIEWS: YES
+    info:
+      path: GismoApp/Info.plist
+      properties:
+        CFBundleDisplayName: Gismo
+        CFBundleName: Gismo
+        UILaunchStoryboardName: ""
+        UIUserInterfaceStyle: Dark
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        NSLocalNetworkUsageDescription: "Gismo robota yerel ağ üzerinden bağlanmak için gereklidir."
+        NSMicrophoneUsageDescription: "Gismo seninle konuşabilmek için mikrofona ihtiyaç duyuyor."
+        NSSpeechRecognitionUsageDescription: "Gismo seni dinleyebilmek için konuşma tanıma iznine ihtiyaç duyuyor."
+        NSCameraUsageDescription: "Gismo fotoğraf çekebilmek için kameraya ihtiyaç duyuyor."
+        NSPhotoLibraryAddUsageDescription: "Gismo çektiği fotoğrafı galerine kaydetmek için izin istiyor."
+        NSBonjourServices:
+          - "_http._tcp"
+        GIDClientID: "312777580050-0od6id68t7gh274aveien553acopmrsr.apps.googleusercontent.com"
+        CFBundleURLTypes:
+          - CFBundleTypeRole: Editor
+            CFBundleURLSchemes:
+              - "com.googleusercontent.apps.312777580050-0od6id68t7gh274aveien553acopmrsr"

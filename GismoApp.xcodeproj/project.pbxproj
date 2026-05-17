@@ -1,0 +1,545 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0972316A47506BFEF7864AC5 /* SetupContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37705E1A13F14F05F5FCB4EA /* SetupContainerView.swift */; };
+		0E816D4FDA9E3BA3B533A111 /* GismoCameraService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D506989F006F0E05585D0A2 /* GismoCameraService.swift */; };
+		12043190AE204CE9F13D668F /* ControlViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40A4F29F0FB82BC34AD65BC3 /* ControlViewModel.swift */; };
+		1769B0BC3A207EFF4B5E3CF1 /* WebSocketService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55049015532F61A7D2C0FBD4 /* WebSocketService.swift */; };
+		3EE21997B84B21F01931E9FC /* GismoVoiceEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD50252591D1738C9504E4DE /* GismoVoiceEngine.swift */; };
+		44074BBD39A44B2583A3081F /* Config.swift in Sources */ = {isa = PBXBuildFile; fileRef = 599A26DAF6D535830EA400D8 /* Config.swift */; };
+		4910EDAB839FE598FFA123E9 /* JoystickView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30F51A6808D3B956CCFDAA07 /* JoystickView.swift */; };
+		52656F15717030F40D1A75B1 /* WiFiNetwork.swift in Sources */ = {isa = PBXBuildFile; fileRef = A286DF2753CE750907F9FC92 /* WiFiNetwork.swift */; };
+		5F3A648DB47808E32501D130 /* Step3PasswordView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 263210368D861D67BA44D571 /* Step3PasswordView.swift */; };
+		6A9A77F084432E89043CEC91 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21F0FCF9633824EE5E6053A7 /* DesignSystem.swift */; };
+		6D82929E081CAD69C2AE34BD /* ESPService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F4666CDDFB137F6067FA30C /* ESPService.swift */; };
+		6EFD514CAB0B5E341EAF304F /* GismoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E6D113F39FA6E5B2E5BB70A /* GismoApp.swift */; };
+		738BA7DBBC34BC504B9F5BD7 /* GismoFaceViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6389410929375F84F7529966 /* GismoFaceViewModel.swift */; };
+		7661EF2C1A172A5C266EFF4F /* GeminiService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 292A1291A9152C8613562BEF /* GeminiService.swift */; };
+		8E624FF1ECDE5630CF96CBF7 /* GoogleDriveService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56A27BF6EFD3A311403B7BCF /* GoogleDriveService.swift */; };
+		9891F289347AEEAE25481580 /* DatabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C430B39F51B6C1F67CCBE335 /* DatabaseService.swift */; };
+		9C3D9C1E2125BE52307869F8 /* OrientationController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7226910B37B830114DDBEC93 /* OrientationController.swift */; };
+		A709CDFC6B0473A922ED007C /* SetupViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88713715C5C1BDED41CCF3C0 /* SetupViewModel.swift */; };
+		AB3F51AD4BF905F5AC4E4975 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 0A3FA8515DBECE10A2DE70DF /* GoogleSignIn */; };
+		AFE846323CAD4EE3FD8E50AC /* RobotListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB9887396A6DC1733D9F208D /* RobotListView.swift */; };
+		B24DC7BA1C636F7A10AB8A85 /* Step2WiFiScanView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 277243752388FCB4C4351036 /* Step2WiFiScanView.swift */; };
+		C02B32055AEC5AACD1F6BFEE /* Robot.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA201353E257FB269F4C1700 /* Robot.swift */; };
+		C44CA75E034B3399EE805710 /* ControlView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E48887149EC5FC2D7350A75 /* ControlView.swift */; };
+		C86F3889F135E3C75F9017BE /* GismoSoundEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C5731916A2F63AB0610B699 /* GismoSoundEngine.swift */; };
+		D0A2F8C3AF796F83F4C5DD95 /* SplashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4D2423611CA26FDB1175486 /* SplashView.swift */; };
+		E6F9C998B3F6AA265C478CE4 /* GismoFaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DE70479E34D67720820F8AB /* GismoFaceView.swift */; };
+		E957EF1DFE1ED02C386C7245 /* RobotListViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 802A82449946EE717D78AEC4 /* RobotListViewModel.swift */; };
+		EE460D3B07F1D3FA85BCDBCC /* Step1ConnectView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 223BE30460AE695E9DC8F8D9 /* Step1ConnectView.swift */; };
+		FAC29F626FA84D908A5046A1 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 18C1BF4CA0DFCB09BEAF3570 /* Assets.xcassets */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		0A11A3114CE7E7E8A0DBFCF2 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		0E6D113F39FA6E5B2E5BB70A /* GismoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GismoApp.swift; sourceTree = "<group>"; };
+		18C1BF4CA0DFCB09BEAF3570 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		21F0FCF9633824EE5E6053A7 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
+		223BE30460AE695E9DC8F8D9 /* Step1ConnectView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Step1ConnectView.swift; sourceTree = "<group>"; };
+		263210368D861D67BA44D571 /* Step3PasswordView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Step3PasswordView.swift; sourceTree = "<group>"; };
+		277243752388FCB4C4351036 /* Step2WiFiScanView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Step2WiFiScanView.swift; sourceTree = "<group>"; };
+		292A1291A9152C8613562BEF /* GeminiService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiService.swift; sourceTree = "<group>"; };
+		2C5731916A2F63AB0610B699 /* GismoSoundEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GismoSoundEngine.swift; sourceTree = "<group>"; };
+		30F51A6808D3B956CCFDAA07 /* JoystickView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JoystickView.swift; sourceTree = "<group>"; };
+		37705E1A13F14F05F5FCB4EA /* SetupContainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupContainerView.swift; sourceTree = "<group>"; };
+		40A4F29F0FB82BC34AD65BC3 /* ControlViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlViewModel.swift; sourceTree = "<group>"; };
+		4F4666CDDFB137F6067FA30C /* ESPService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ESPService.swift; sourceTree = "<group>"; };
+		55049015532F61A7D2C0FBD4 /* WebSocketService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebSocketService.swift; sourceTree = "<group>"; };
+		56A27BF6EFD3A311403B7BCF /* GoogleDriveService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleDriveService.swift; sourceTree = "<group>"; };
+		599A26DAF6D535830EA400D8 /* Config.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Config.swift; sourceTree = "<group>"; };
+		6389410929375F84F7529966 /* GismoFaceViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GismoFaceViewModel.swift; sourceTree = "<group>"; };
+		7226910B37B830114DDBEC93 /* OrientationController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrientationController.swift; sourceTree = "<group>"; };
+		7E48887149EC5FC2D7350A75 /* ControlView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlView.swift; sourceTree = "<group>"; };
+		802A82449946EE717D78AEC4 /* RobotListViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RobotListViewModel.swift; sourceTree = "<group>"; };
+		88713715C5C1BDED41CCF3C0 /* SetupViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupViewModel.swift; sourceTree = "<group>"; };
+		8DE70479E34D67720820F8AB /* GismoFaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GismoFaceView.swift; sourceTree = "<group>"; };
+		9D506989F006F0E05585D0A2 /* GismoCameraService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GismoCameraService.swift; sourceTree = "<group>"; };
+		A286DF2753CE750907F9FC92 /* WiFiNetwork.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WiFiNetwork.swift; sourceTree = "<group>"; };
+		AD50252591D1738C9504E4DE /* GismoVoiceEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GismoVoiceEngine.swift; sourceTree = "<group>"; };
+		B4D2423611CA26FDB1175486 /* SplashView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplashView.swift; sourceTree = "<group>"; };
+		BB9887396A6DC1733D9F208D /* RobotListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RobotListView.swift; sourceTree = "<group>"; };
+		C430B39F51B6C1F67CCBE335 /* DatabaseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseService.swift; sourceTree = "<group>"; };
+		DA201353E257FB269F4C1700 /* Robot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Robot.swift; sourceTree = "<group>"; };
+		E33E26B05AFE3CF2F6F4167B /* GismoApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = GismoApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		02058EA45BFE26AD5E18F0AE /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AB3F51AD4BF905F5AC4E4975 /* GoogleSignIn in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		1047DCECCA84AA90687E33AC /* Design */ = {
+			isa = PBXGroup;
+			children = (
+				21F0FCF9633824EE5E6053A7 /* DesignSystem.swift */,
+			);
+			path = Design;
+			sourceTree = "<group>";
+		};
+		197722783D45CE4FF65804A5 /* Splash */ = {
+			isa = PBXGroup;
+			children = (
+				B4D2423611CA26FDB1175486 /* SplashView.swift */,
+			);
+			path = Splash;
+			sourceTree = "<group>";
+		};
+		2CEAF0D1B4A2A2E56296387A /* GismoApp */ = {
+			isa = PBXGroup;
+			children = (
+				855EFEEF6214938032637C14 /* App */,
+				BB259BC5437859D36D4107A0 /* Config */,
+				1047DCECCA84AA90687E33AC /* Design */,
+				C3179AA66CEB458E4B396278 /* Models */,
+				3958156C30FD53D5DC3ECE2C /* Services */,
+				B7FCFA7566BD0CAA9D2D31B5 /* ViewModels */,
+				DCBF7E08D0B8283A6ABE5B1E /* Views */,
+				18C1BF4CA0DFCB09BEAF3570 /* Assets.xcassets */,
+				0A11A3114CE7E7E8A0DBFCF2 /* Info.plist */,
+			);
+			path = GismoApp;
+			sourceTree = "<group>";
+		};
+		3958156C30FD53D5DC3ECE2C /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				C430B39F51B6C1F67CCBE335 /* DatabaseService.swift */,
+				4F4666CDDFB137F6067FA30C /* ESPService.swift */,
+				292A1291A9152C8613562BEF /* GeminiService.swift */,
+				9D506989F006F0E05585D0A2 /* GismoCameraService.swift */,
+				2C5731916A2F63AB0610B699 /* GismoSoundEngine.swift */,
+				AD50252591D1738C9504E4DE /* GismoVoiceEngine.swift */,
+				56A27BF6EFD3A311403B7BCF /* GoogleDriveService.swift */,
+				55049015532F61A7D2C0FBD4 /* WebSocketService.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		55760C0B26EB6287A8BD6370 = {
+			isa = PBXGroup;
+			children = (
+				2CEAF0D1B4A2A2E56296387A /* GismoApp */,
+				9CB0B1AE3E605A2AA6578AF5 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		7A0E5F8CDE0457181CE3ED11 /* RobotList */ = {
+			isa = PBXGroup;
+			children = (
+				BB9887396A6DC1733D9F208D /* RobotListView.swift */,
+			);
+			path = RobotList;
+			sourceTree = "<group>";
+		};
+		855EFEEF6214938032637C14 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				0E6D113F39FA6E5B2E5BB70A /* GismoApp.swift */,
+				7226910B37B830114DDBEC93 /* OrientationController.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		872230111F53585C7AA17072 /* Control */ = {
+			isa = PBXGroup;
+			children = (
+				7E48887149EC5FC2D7350A75 /* ControlView.swift */,
+				30F51A6808D3B956CCFDAA07 /* JoystickView.swift */,
+			);
+			path = Control;
+			sourceTree = "<group>";
+		};
+		9CB0B1AE3E605A2AA6578AF5 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				E33E26B05AFE3CF2F6F4167B /* GismoApp.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		AA9C2F694891E4B8FF2C72F0 /* Face */ = {
+			isa = PBXGroup;
+			children = (
+				8DE70479E34D67720820F8AB /* GismoFaceView.swift */,
+			);
+			path = Face;
+			sourceTree = "<group>";
+		};
+		B7FCFA7566BD0CAA9D2D31B5 /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				40A4F29F0FB82BC34AD65BC3 /* ControlViewModel.swift */,
+				6389410929375F84F7529966 /* GismoFaceViewModel.swift */,
+				802A82449946EE717D78AEC4 /* RobotListViewModel.swift */,
+				88713715C5C1BDED41CCF3C0 /* SetupViewModel.swift */,
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		BB259BC5437859D36D4107A0 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				599A26DAF6D535830EA400D8 /* Config.swift */,
+			);
+			path = Config;
+			sourceTree = "<group>";
+		};
+		C3179AA66CEB458E4B396278 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				DA201353E257FB269F4C1700 /* Robot.swift */,
+				A286DF2753CE750907F9FC92 /* WiFiNetwork.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		DCBF7E08D0B8283A6ABE5B1E /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				872230111F53585C7AA17072 /* Control */,
+				AA9C2F694891E4B8FF2C72F0 /* Face */,
+				7A0E5F8CDE0457181CE3ED11 /* RobotList */,
+				F5338888D3175E1B16356405 /* Setup */,
+				197722783D45CE4FF65804A5 /* Splash */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		F5338888D3175E1B16356405 /* Setup */ = {
+			isa = PBXGroup;
+			children = (
+				37705E1A13F14F05F5FCB4EA /* SetupContainerView.swift */,
+				223BE30460AE695E9DC8F8D9 /* Step1ConnectView.swift */,
+				277243752388FCB4C4351036 /* Step2WiFiScanView.swift */,
+				263210368D861D67BA44D571 /* Step3PasswordView.swift */,
+			);
+			path = Setup;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		52FFE56844F70D1E0176B216 /* GismoApp */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8AF21DF601540817681E9388 /* Build configuration list for PBXNativeTarget "GismoApp" */;
+			buildPhases = (
+				859DC00C2599498D17412C61 /* Sources */,
+				D916604D8DACB61C6AAE4BB8 /* Resources */,
+				02058EA45BFE26AD5E18F0AE /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = GismoApp;
+			packageProductDependencies = (
+				0A3FA8515DBECE10A2DE70DF /* GoogleSignIn */,
+			);
+			productName = GismoApp;
+			productReference = E33E26B05AFE3CF2F6F4167B /* GismoApp.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		44F8752B06FC968CB6D999F5 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1500;
+			};
+			buildConfigurationList = 878903FC0440BBE4594CF5F4 /* Build configuration list for PBXProject "GismoApp" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 55760C0B26EB6287A8BD6370;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				E2E0864F3D57A3366718C368 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 9CB0B1AE3E605A2AA6578AF5 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				52FFE56844F70D1E0176B216 /* GismoApp */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		D916604D8DACB61C6AAE4BB8 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FAC29F626FA84D908A5046A1 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		859DC00C2599498D17412C61 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				44074BBD39A44B2583A3081F /* Config.swift in Sources */,
+				C44CA75E034B3399EE805710 /* ControlView.swift in Sources */,
+				12043190AE204CE9F13D668F /* ControlViewModel.swift in Sources */,
+				9891F289347AEEAE25481580 /* DatabaseService.swift in Sources */,
+				6A9A77F084432E89043CEC91 /* DesignSystem.swift in Sources */,
+				6D82929E081CAD69C2AE34BD /* ESPService.swift in Sources */,
+				7661EF2C1A172A5C266EFF4F /* GeminiService.swift in Sources */,
+				6EFD514CAB0B5E341EAF304F /* GismoApp.swift in Sources */,
+				0E816D4FDA9E3BA3B533A111 /* GismoCameraService.swift in Sources */,
+				E6F9C998B3F6AA265C478CE4 /* GismoFaceView.swift in Sources */,
+				738BA7DBBC34BC504B9F5BD7 /* GismoFaceViewModel.swift in Sources */,
+				C86F3889F135E3C75F9017BE /* GismoSoundEngine.swift in Sources */,
+				3EE21997B84B21F01931E9FC /* GismoVoiceEngine.swift in Sources */,
+				8E624FF1ECDE5630CF96CBF7 /* GoogleDriveService.swift in Sources */,
+				4910EDAB839FE598FFA123E9 /* JoystickView.swift in Sources */,
+				9C3D9C1E2125BE52307869F8 /* OrientationController.swift in Sources */,
+				C02B32055AEC5AACD1F6BFEE /* Robot.swift in Sources */,
+				AFE846323CAD4EE3FD8E50AC /* RobotListView.swift in Sources */,
+				E957EF1DFE1ED02C386C7245 /* RobotListViewModel.swift in Sources */,
+				0972316A47506BFEF7864AC5 /* SetupContainerView.swift in Sources */,
+				A709CDFC6B0473A922ED007C /* SetupViewModel.swift in Sources */,
+				D0A2F8C3AF796F83F4C5DD95 /* SplashView.swift in Sources */,
+				EE460D3B07F1D3FA85BCDBCC /* Step1ConnectView.swift in Sources */,
+				B24DC7BA1C636F7A10AB8A85 /* Step2WiFiScanView.swift in Sources */,
+				5F3A648DB47808E32501D130 /* Step3PasswordView.swift in Sources */,
+				1769B0BC3A207EFF4B5E3CF1 /* WebSocketService.swift in Sources */,
+				52656F15717030F40D1A75B1 /* WiFiNetwork.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		2DD50501BD8F0B35D4805FDF /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		626BA5A10B31EDA466015390 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		946AECF16D79A05E96755CBD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = ZS89AATCJ2;
+				ENABLE_PREVIEWS = YES;
+				INFOPLIST_FILE = GismoApp/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.gismo.app;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		F39F6A4135FD6C413F8DE7B1 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = ZS89AATCJ2;
+				ENABLE_PREVIEWS = YES;
+				INFOPLIST_FILE = GismoApp/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.gismo.app;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		878903FC0440BBE4594CF5F4 /* Build configuration list for PBXProject "GismoApp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				626BA5A10B31EDA466015390 /* Debug */,
+				2DD50501BD8F0B35D4805FDF /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		8AF21DF601540817681E9388 /* Build configuration list for PBXNativeTarget "GismoApp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				946AECF16D79A05E96755CBD /* Debug */,
+				F39F6A4135FD6C413F8DE7B1 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		E2E0864F3D57A3366718C368 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/google/GoogleSignIn-iOS";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 7.1.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		0A3FA8515DBECE10A2DE70DF /* GoogleSignIn */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E2E0864F3D57A3366718C368 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignIn;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 44F8752B06FC968CB6D999F5 /* Project object */;
+}
