@@ -44,6 +44,7 @@
 		18C1BF4CA0DFCB09BEAF3570 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		21F0FCF9633824EE5E6053A7 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
 		223BE30460AE695E9DC8F8D9 /* Step1ConnectView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Step1ConnectView.swift; sourceTree = "<group>"; };
+		227CA7CC2FBC8031004EEAEC /* TestPlan.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = TestPlan.xctestplan; sourceTree = "<group>"; };
 		263210368D861D67BA44D571 /* Step3PasswordView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Step3PasswordView.swift; sourceTree = "<group>"; };
 		277243752388FCB4C4351036 /* Step2WiFiScanView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Step2WiFiScanView.swift; sourceTree = "<group>"; };
 		292A1291A9152C8613562BEF /* GeminiService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiService.swift; sourceTree = "<group>"; };
@@ -133,6 +134,7 @@
 		55760C0B26EB6287A8BD6370 = {
 			isa = PBXGroup;
 			children = (
+				227CA7CC2FBC8031004EEAEC /* TestPlan.xctestplan */,
 				2CEAF0D1B4A2A2E56296387A /* GismoApp */,
 				9CB0B1AE3E605A2AA6578AF5 /* Products */,
 			);
@@ -460,7 +462,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = ZS89AATCJ2;
+				DEVELOPMENT_TEAM = TCJ3Q8HPWS;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = GismoApp/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
@@ -483,7 +485,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = ZS89AATCJ2;
+				DEVELOPMENT_TEAM = TCJ3Q8HPWS;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = GismoApp/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;

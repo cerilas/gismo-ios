@@ -1,6 +1,7 @@
 import SwiftUI
 import Combine
 import ARKit
+import Vision
 
 // MARK: - GismoFaceViewModel
 
@@ -29,8 +30,24 @@ final class GismoFaceViewModel: ObservableObject {
     private var idleTask: Task<Void, Never>?
     private var smileObserverTask: AnyCancellable?
     private var trackingObserverTask: AnyCancellable?
-    private var currentTrackingCommand: RobotCommand = .stop
+    @Published var currentTrackingCommand: RobotCommand = .stop
     private let idleTimeout: Double = 60  // saniye
+
+    // MARK: - Pulse & Settle Takip State Machine
+    private enum TrackingState {
+        case idle
+        case moving(until: Date)
+        case settling(until: Date)
+    }
+    private var trackingState: TrackingState = .idle
+    /// Sabit çok kısa burst: robot tek bir kışı adım atar (0.04 sn)
+    private let burstSeconds: TimeInterval = 0.04
+
+    // Anti-spin koruma: ard arda yön değişimi sayılır
+    private var lastBurstDirection: RobotCommand? = nil
+    private var flipCount: Int = 0
+    private let flipLimit: Int = 2         // Kaç ard arda flip'ten sonra soğuma
+    private let cooldownSeconds: TimeInterval = 1.5  // Soğuma süresi
     
     // Işık / Parlaklık takibi
     private var lastBrightness: CGFloat = UIScreen.main.brightness
@@ -55,13 +72,10 @@ final class GismoFaceViewModel: ObservableObject {
             }
         }
         
-        // Motor ile Yüz Takibi (Sessizlik anlarında)
-        trackingObserverTask = vision.$eyeOffset
-            // Saniyede ~6 kere kontrol et (aşırı mesaj göndermemek için)
-            .throttle(for: .milliseconds(150), scheduler: DispatchQueue.main, latest: true)
-            .sink { [weak self] offset in
-                self?.handleFaceTracking(offset: offset)
-            }
+        // Motor ile Akıllı Takip — faceScreenPosition değişince state machine'ı tetikle
+        trackingObserverTask = vision.$faceScreenPosition
+            .throttle(for: .milliseconds(200), scheduler: DispatchQueue.main, latest: true)
+            .sink { [weak self] _ in self?.handleSmartTracking() }
     }
     
     private func takePhotoForAI() async -> Data? {
@@ -71,31 +85,79 @@ final class GismoFaceViewModel: ObservableObject {
         return image?.jpegData(compressionQuality: 0.8)
     }
     
-    private func handleFaceTracking(offset: CGPoint) {
-        // Sadece AI düşünmüyorsa, yanıt göstermiyorsa ve takip modu açıksa izleme yap
+    /// Yalnızca yüz ekranda vardıysa ve merkezden kaymışsa motor komutu gönderir.
+    /// Yüz yoksa (nil) → hemen dur. Vücut takibi motor kontrolde kullanılmaz.
+    private func handleSmartTracking() {
         guard !isThinking && !showResponse && currentEmotion != .sleeping && isTrackingEnabled else {
-            if currentTrackingCommand != .stop {
-                sendTrackingCommand(.stop)
-            }
+            sendTrackingCommand(.stop)
+            trackingState = .idle
+            flipCount = 0; lastBurstDirection = nil
             return
         }
-        
-        let xPos = offset.x // -1.0 (sol) to 1.0 (sağ)
-        let deadzone: CGFloat = 0.20 // Yüzün ortada sayılacağı eşik
-        
-        var desiredCommand: RobotCommand = .stop
-        
-        if xPos > deadzone {
-            desiredCommand = .right
-        } else if xPos < -deadzone {
-            desiredCommand = .left
+
+        // Yüz görünmüyorsa anında dur
+        guard let facePos = vision.faceScreenPosition else {
+            sendTrackingCommand(.stop)
+            trackingState = .idle
+            flipCount = 0; lastBurstDirection = nil
+            return
         }
-        
-        if currentTrackingCommand != desiredCommand {
-            sendTrackingCommand(desiredCommand)
+
+        // -1 (sol) … 0 (merkez) … +1 (sağ)
+        let xPos = (facePos.x - 0.5) * 2.0
+        let now  = Date()
+        let threshold: CGFloat = 0.65   // Ekran kenarına yakınsa tepki ver (±65%)
+
+        // !! ÖNCE KONTROL: Yüz merkezde mi? Her durumda anında dur !!
+        if abs(xPos) <= threshold {
+            if currentTrackingCommand != .stop { sendTrackingCommand(.stop) }
+            trackingState = .idle
+            flipCount = 0; lastBurstDirection = nil
+            return
         }
+
+        // Yüz merkezde değil — state machine'e göre davran
+        switch trackingState {
+
+        case .moving(let until):
+            // Burst süresi bitti → dur, settle'a geç
+            if now >= until {
+                sendTrackingCommand(.stop)
+                // Kamera stabilize olsun + ARKit yüzü yeniden yakalasın
+                trackingState = .settling(until: now.addingTimeInterval(0.60))
+            }
+            return  // Burst devam ediyor — müdahale etme
+
+        case .settling(let until):
+            guard now >= until else { return }
+            trackingState = .idle
+
+        case .idle:
+            break
+        }
+
+        // ── Idle: yeni burst değerlendirmesi ──
+        let direction: RobotCommand = xPos > 0 ? .left : .right
+
+        // Anti-spin: ard arda ters yön → zorunlu soğuma
+        if let last = lastBurstDirection, last != direction {
+            flipCount += 1
+            if flipCount >= flipLimit {
+                print("[Tracking] Anti-spin: \(cooldownSeconds)sn soğuma")
+                sendTrackingCommand(.stop)
+                trackingState = .settling(until: now.addingTimeInterval(cooldownSeconds))
+                flipCount = 0; lastBurstDirection = nil
+                return
+            }
+        } else if lastBurstDirection == direction {
+            flipCount = 0
+        }
+        lastBurstDirection = direction
+
+        sendTrackingCommand(direction)
+        trackingState = .moving(until: now.addingTimeInterval(burstSeconds))
     }
-    
+
     private func sendTrackingCommand(_ cmd: RobotCommand) {
         currentTrackingCommand = cmd
         Task {
@@ -228,6 +290,13 @@ final class GismoFaceViewModel: ObservableObject {
         } catch {
             print("Gemini hata: \(error.localizedDescription)")
             setEmotion(.neutral, for: 0)
+            
+            // Test modundaysak hatayı ekrana yazdır
+            if UserDefaults.standard.bool(forKey: "isTestModeEnabled") {
+                aiResponse = "TEST MODU HATASI: \(error.localizedDescription)"
+                showResponse = true
+                scheduleHideResponse(after: 6.0)
+            }
         }
 
         isThinking = false
@@ -376,95 +445,165 @@ final class GismoFaceViewModel: ObservableObject {
 }
 // MARK: - GismoVisionService
 
+/// ARKit yüz takibi + Apple Vision vücut poz tespitini paralel çalıştıran servis.
+/// ARKit → ön TrueDepth kamera → gülümseme, göz yönü, yüz 3D pozisyonu
+/// Vision → aynı ARKit frame buffer'ı → yüz bbox, insan vücut iskeleti
 @MainActor
 final class GismoVisionService: NSObject, ObservableObject, ARSessionDelegate {
-    
-    @Published var eyeOffset: CGPoint = .zero
-    @Published var isSmiling: Bool = false
-    
-    private let session = ARSession()
+
+    // MARK: - Published State
+
+    @Published var eyeOffset: CGPoint = .zero       // Lens göz yönü (UI)
+    @Published var isSmiling:  Bool = false          // ARKit blend shape gülümseme
+
+    /// Kamera Takip Paneli için ek veriler
+    @Published var isFaceDetected:    Bool = false   // ARKit anchor aktif mi
+    @Published var isBodyDetected:    Bool = false   // Vision iskelet tespit edildi mi
+    @Published var bodyOffset:        CGPoint = .zero
+    /// ARKit projectPoint ile landscape 2D'ye dönüştürülmüş yüz merkezi (0-1 normalize).
+    /// x: 0=sol, 0.5=merkez, 1=sağ  |  nil: yüz yok
+    @Published var faceScreenPosition: CGPoint? = nil
+
+    // CameraTrackingPanel bu session'ı ARSCNView'a verir
+    let session = ARSession()
     private var isRunning = false
-    
+
+    // MARK: - Vision Throttle (nonisolated fonksiyondan erişilir — ayrı class ile thread-safe)
+    private final class FrameThrottle: @unchecked Sendable {
+        var lastTime: TimeInterval = 0
+    }
+    private let throttle = FrameThrottle()
+    private let visionInterval: TimeInterval = 0.14  // ~7 FPS Vision işleme
+
     override init() {
         super.init()
         session.delegate = self
     }
-    
-    // MARK: - Public
-    
+
+    // MARK: - Lifecycle
+
     func start() {
         guard !isRunning else { return }
         guard ARFaceTrackingConfiguration.isSupported else {
             print("[Vision] Face tracking is not supported on this device.")
             return
         }
-        
         let config = ARFaceTrackingConfiguration()
-        // We only care about tracking the user's face, we don't need high res video
         session.run(config, options: [.resetTracking, .removeExistingAnchors])
         isRunning = true
-        print("[Vision] AR Face Tracking started.")
+        print("[Vision] AR Face Tracking + Vision Body Pose started.")
     }
-    
+
     func stop() {
         guard isRunning else { return }
         session.pause()
         isRunning = false
-        print("[Vision] AR Face Tracking stopped.")
-        
-        // Reset gözleri ortaya al
+        print("[Vision] Stopped.")
         withAnimation(.spring()) {
-            self.eyeOffset = .zero
-            self.isSmiling = false
+            self.eyeOffset          = .zero
+            self.isSmiling          = false
+            self.isFaceDetected     = false
+            self.isBodyDetected     = false
+            self.bodyOffset         = .zero
+            self.faceScreenPosition = nil
         }
     }
-    
-    // MARK: - ARSessionDelegate
-    
+
+    // MARK: - ARSessionDelegate: Anchor (yüz 3D mesh + ifade)
+
     nonisolated func session(_ session: ARSession, didUpdate anchors: [ARAnchor]) {
-        guard let faceAnchor = anchors.compactMap({ $0 as? ARFaceAnchor }).first else {
-            // Yüz görünmüyorsa gözleri ortaya al
-            Task { @MainActor in
-                if self.eyeOffset != .zero {
-                    withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                        self.eyeOffset = .zero
-                    }
+        // Sadece face anchor'ları işle; diğer anchor türleri bu callback'i de tetikler,
+        // onlar için isFaceDetected sıfırlanmamalı.
+        guard let face = anchors.compactMap({ $0 as? ARFaceAnchor }).first else {
+            return  // Bu güncelleme başka bir anchor için — yüz durumunu değiştirme
+        }
+
+        // Gülümseme (Blend Shapes)
+        let smileL = face.blendShapes[.mouthSmileLeft]?.floatValue  ?? 0
+        let smileR = face.blendShapes[.mouthSmileRight]?.floatValue ?? 0
+        let smiling = (smileL + smileR) / 2.0 > 0.45
+
+        // ARKit kamera projeksiyonu — yüz anchor'ı landscape 2D'ye dönüştür
+        // Bu yöntem portrait/landscape orientation karışıklığını ARKit'ın kendisi çözer.
+        let facePos3D = SIMD3<Float>(
+            face.transform.columns.3.x,
+            face.transform.columns.3.y,
+            face.transform.columns.3.z
+        )
+
+        // Referans viewport: landscape boyutları
+        guard let frame = session.currentFrame else { return }
+        let res = frame.camera.imageResolution  // portrait native ölçü (orn. 1440x1920)
+        let landscapeSize = CGSize(width: res.height, height: res.width)  // landscape'e çevir
+
+        let projected = frame.camera.projectPoint(
+            facePos3D,
+            orientation: .landscapeRight,   // uygulamamızın landscape kilidi
+            viewportSize: landscapeSize
+        )
+
+        // Normalize: 0-1 aralığına getir, ekran dışı clip'le
+        let nx = CGFloat(max(0, min(1, projected.x / landscapeSize.width)))
+        let ny = CGFloat(max(0, min(1, projected.y / landscapeSize.height)))
+
+        // Lens göz öteleme: merkez = 0, sol = negatif, sağ = pozitif
+        let eyeX = (nx - 0.5) * 2.0
+        let eyeY = (ny - 0.5) * 2.0
+
+        Task { @MainActor in
+            self.isFaceDetected     = true
+            self.faceScreenPosition = CGPoint(x: nx, y: ny)
+            if self.isSmiling != smiling { self.isSmiling = smiling }
+            withAnimation(.interactiveSpring(response: 0.15, dampingFraction: 0.85, blendDuration: 0)) {
+                self.eyeOffset = CGPoint(x: eyeX, y: -eyeY)
+            }
+        }
+    }
+
+    /// Yüz anchor kaldırıldığında (gerçek yüz kaybı) durumu sıfırla.
+    nonisolated func session(_ session: ARSession, didRemove anchors: [ARAnchor]) {
+        guard anchors.contains(where: { $0 is ARFaceAnchor }) else { return }
+        Task { @MainActor in
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                self.eyeOffset          = .zero
+                self.isFaceDetected     = false
+                self.faceScreenPosition = nil
+            }
+        }
+    }
+
+    // MARK: - ARSessionDelegate: Frame (Vision vücut pozu — yüz için ARKit kullanılıyor)
+
+    nonisolated func session(_ session: ARSession, didUpdate frame: ARFrame) {
+        let now = frame.timestamp
+        guard now - throttle.lastTime > visionInterval else { return }
+        throttle.lastTime = now
+
+        // Sadece vücut pozu — yüz pozisyonu artık ARKit anchor'dan geliyor
+        let bodyReq = VNDetectHumanBodyPoseRequest()
+        let handler = VNImageRequestHandler(cvPixelBuffer: frame.capturedImage,
+                                             orientation: .right,
+                                             options: [:])
+        try? handler.perform([bodyReq])
+
+        let bodyObs = bodyReq.results?.first
+        var bodyX: CGFloat? = nil
+        if let obs = bodyObs {
+            for joint: VNHumanBodyPoseObservation.JointName in [.neck, .root] {
+                if let pt = try? obs.recognizedPoint(joint), pt.confidence > 0.6 {
+                    bodyX = CGFloat(pt.location.x)
+                    break
                 }
             }
-            return
         }
-        
-        // 1. Gülümseme Tespiti (Blend Shapes)
-        let smileLeft = faceAnchor.blendShapes[.mouthSmileLeft]?.floatValue ?? 0
-        let smileRight = faceAnchor.blendShapes[.mouthSmileRight]?.floatValue ?? 0
-        let currentSmile = (smileLeft + smileRight) / 2.0
-        let isSmilingNow = currentSmile > 0.45 // Eşik değeri
-        
-        // 2. Göz Takibi / Kafa Yönü (Head Translation)
-        // Kullanıcının kafası ekranda nereye gidiyorsa, Gismo'nun gözleri de ona bakmalı
-        let transform = faceAnchor.transform
-        let xPos = transform.columns.3.x // - (sol) to + (sağ) metre cinsinden
-        let yPos = transform.columns.3.y // - (aşağı) to + (yukarı) metre cinsinden
-        
-        // Değerleri normalize et: X ve Y eksenlerinde ne kadar kayacak (-1.0 ile 1.0 arası)
-        // Genelde xPos -0.15 ile +0.15 arasında değişir (kamera karşısındayken)
-        let normalizedX = CGFloat(max(-1, min(1, xPos * 6.0)))
-        let normalizedY = CGFloat(max(-1, min(1, yPos * 6.0)))
-        
+
         Task { @MainActor in
-            // Gülümseme durumu değiştiyse güncelle
-            if self.isSmiling != isSmilingNow {
-                self.isSmiling = isSmilingNow
-            }
-            
-            // Göz bebeklerinin hedef konumu
-            // Kullanıcı sağa giderse (xPos +), Gismo da sağa (x +) bakmalı
-            // Kullanıcı yukarı çıkarsa (yPos +), Gismo da yukarı (y - UI koordinatlarında) bakmalı
-            let targetOffset = CGPoint(x: normalizedX, y: -normalizedY)
-            
-            // Yumuşak bir geçişle gözleri takip ettir
-            withAnimation(.interactiveSpring(response: 0.15, dampingFraction: 0.85, blendDuration: 0)) {
-                self.eyeOffset = targetOffset
+            if let bx = bodyX {
+                self.isBodyDetected = true
+                self.bodyOffset     = CGPoint(x: (bx - 0.5) * 2.0, y: 0)
+            } else {
+                self.isBodyDetected = false
+                self.bodyOffset     = .zero
             }
         }
     }

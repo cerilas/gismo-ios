@@ -1,4 +1,6 @@
 import SwiftUI
+import ARKit
+import SceneKit
 import GoogleSignIn
 
 // MARK: - GismoEmotion (internal so ViewModel can reference via GismoEmotion.from)
@@ -156,47 +158,174 @@ struct GismoFaceView: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let canvasSize = min(geometry.size.width * 0.92, geometry.size.height * 1.65)
+            // ──── Ekran bölünmesi: göz takibi aktifse %58 yüz + %42 kamera ────
+            let panelW    = vm.isTrackingEnabled ? geometry.size.width * 0.58 : geometry.size.width
+            let canvasSize = min(panelW * 0.92, geometry.size.height * 1.65)
             let eyeWidth   = canvasSize * emotion.eyeWidthRatio
             let eyeHeight  = canvasSize * emotion.eyeHeightRatio
 
             ZStack {
+                // Tam ekran arka plan (her iki panelin altında)
                 emotion.background.ignoresSafeArea()
 
-                RadialGradient(
-                    colors: [emotion.primary.opacity(0.34), .clear],
-                    center: .center,
-                    startRadius: canvasSize * 0.08,
-                    endRadius: canvasSize * 0.8
-                )
-                .scaleEffect(pulse ? 1.08 : 0.94)
-                .animation(.easeInOut(duration: emotion.pulseDuration).repeatForever(autoreverses: true), value: pulse)
-                .ignoresSafeArea()
+                // ── Yatay panel satırı ──────────────────────────────────────
+                HStack(spacing: 0) {
 
-                FaceEffectLayer(emotion: emotion, canvasSize: canvasSize, floatPhase: floatPhase)
+                    // ─── Sol: Robot Yüzü ──────────────────────────────────────
+                    ZStack {
+                        RadialGradient(
+                            colors: [emotion.primary.opacity(0.34), .clear],
+                            center: .center,
+                            startRadius: canvasSize * 0.08,
+                            endRadius: canvasSize * 0.8
+                        )
+                        .scaleEffect(pulse ? 1.08 : 0.94)
+                        .animation(.easeInOut(duration: emotion.pulseDuration).repeatForever(autoreverses: true), value: pulse)
 
-                VStack(spacing: canvasSize * 0.04) {
-                    Spacer(minLength: canvasSize * 0.02)
-                    HStack(spacing: canvasSize * emotion.eyeSpacingRatio) {
-                        // Sol göz → kamera lens modunda lens'e dönüşür
-                        if vm.camera.lensMode {
-                            CameraLensEye(size: eyeWidth, color: emotion.primary)
-                                .transition(.scale.combined(with: .opacity))
-                        } else {
-                            GismoEye(emotion: emotion, side: .left, width: eyeWidth, height: eyeHeight, isBlinking: blink, floatPhase: floatPhase)
-                                .transition(.scale.combined(with: .opacity))
+                        FaceEffectLayer(emotion: emotion, canvasSize: canvasSize, floatPhase: floatPhase)
+
+                        VStack(spacing: canvasSize * 0.04) {
+                            Spacer(minLength: canvasSize * 0.02)
+                            HStack(spacing: canvasSize * emotion.eyeSpacingRatio) {
+                                // Sol göz → lens modunda lens'e dönüşür
+                                if vm.camera.lensMode {
+                                    CameraLensEye(size: eyeWidth, color: emotion.primary)
+                                        .transition(.scale.combined(with: .opacity))
+                                } else {
+                                    GismoEye(emotion: emotion, side: .left, width: eyeWidth, height: eyeHeight,
+                                             isBlinking: blink, floatPhase: floatPhase)
+                                        .transition(.scale.combined(with: .opacity))
+                                }
+                                GismoEye(emotion: emotion, side: .right, width: eyeWidth, height: eyeHeight,
+                                         isBlinking: blink, floatPhase: floatPhase)
+                            }
+                            .animation(.spring(response: 0.4, dampingFraction: 0.65), value: vm.camera.lensMode)
+                            .offset(y: canvasSize * emotion.eyeYOffsetRatio)
+                            GismoMouth(emotion: emotion, size: canvasSize)
+                                .offset(y: canvasSize * emotion.mouthYOffsetRatio)
+                            Spacer(minLength: canvasSize * 0.02)
                         }
-                        GismoEye(emotion: emotion, side: .right, width: eyeWidth, height: eyeHeight, isBlinking: blink, floatPhase: floatPhase)
-                    }
-                    .animation(.spring(response: 0.4, dampingFraction: 0.65), value: vm.camera.lensMode)
-                    .offset(y: canvasSize * emotion.eyeYOffsetRatio)
-                    GismoMouth(emotion: emotion, size: canvasSize)
-                        .offset(y: canvasSize * emotion.mouthYOffsetRatio)
-                    Spacer(minLength: canvasSize * 0.02)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                // Shutter flaşı
+                        // Üst butonlar + duygu + durum
+                        VStack {
+                            HStack(spacing: 12) {
+                                Button { dismiss() } label: {
+                                    Image(systemName: "xmark")
+                                        .font(.system(size: 15, weight: .bold))
+                                        .foregroundColor(.white.opacity(0.9))
+                                        .frame(width: 42, height: 42)
+                                        .background(Circle().fill(Color.black.opacity(0.28)))
+                                }
+                                .buttonStyle(ScaleButtonStyle())
+
+                                // Göz ikonu — aktifken neon halka
+                                Button {
+                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                                        vm.isTrackingEnabled.toggle()
+                                    }
+                                } label: {
+                                    Image(systemName: vm.isTrackingEnabled ? "eye.fill" : "eye.slash.fill")
+                                        .font(.system(size: 15, weight: .bold))
+                                        .foregroundColor(vm.isTrackingEnabled ? emotion.primary : .white.opacity(0.3))
+                                        .frame(width: 42, height: 42)
+                                        .background(Circle().fill(
+                                            vm.isTrackingEnabled
+                                                ? emotion.primary.opacity(0.18)
+                                                : Color.black.opacity(0.28)
+                                        ))
+                                        .overlay(
+                                            Circle()
+                                                .stroke(
+                                                    vm.isTrackingEnabled ? emotion.primary.opacity(0.8) : .clear,
+                                                    lineWidth: 1.5
+                                                )
+                                                .shadow(color: emotion.primary.opacity(vm.isTrackingEnabled ? 0.6 : 0), radius: 6)
+                                        )
+                                }
+                                .buttonStyle(ScaleButtonStyle())
+
+                                Spacer()
+                                VStack(alignment: .trailing, spacing: 2) {
+                                    Text(emotion.title)
+                                        .font(.system(size: 18, weight: .black, design: .rounded))
+                                        .foregroundColor(.white)
+                                    Text(vm.robot.name)
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundColor(.white.opacity(0.58))
+                                }
+                            }
+                            .padding(.horizontal, 22)
+                            .padding(.top, 18)
+
+                            Spacer()
+
+                            // AI yanıt balonu
+                            if vm.showResponse && !vm.aiResponse.isEmpty {
+                                Text(vm.aiResponse)
+                                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                                    .foregroundColor(.white)
+                                    .multilineTextAlignment(.center)
+                                    .padding(.horizontal, 20)
+                                    .padding(.vertical, 12)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                            .fill(Color.black.opacity(0.52))
+                                            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                                .stroke(emotion.primary.opacity(0.4), lineWidth: 1))
+                                    )
+                                    .padding(.horizontal, 24)
+                                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+                            }
+
+                            // Canlı transkript
+                            if !vm.liveTranscript.isEmpty {
+                                Text(vm.liveTranscript)
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.4))
+                                    .lineLimit(1)
+                                    .truncationMode(.head)
+                                    .padding(.horizontal, 28)
+                                    .transition(.opacity)
+                            }
+
+                            // Durum göstergesi
+                            HStack(spacing: 6) {
+                                if vm.isThinking {
+                                    ProgressView().tint(.white.opacity(0.7)).scaleEffect(0.7)
+                                    Text("Düşünüyor...")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundColor(.white.opacity(0.5))
+                                } else if vm.permissionDenied {
+                                    Image(systemName: "mic.slash").font(.system(size: 12)).foregroundColor(.red.opacity(0.7))
+                                    Text("Mikrofon izni gerekli")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundColor(.red.opacity(0.7))
+                                } else {
+                                    MicPulseIndicator(isActive: vm.isListening, color: emotion.primary)
+                                    Text(vm.isListening ? "Dinliyor" : "Bağlanıyor...")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundColor(.white.opacity(0.45))
+                                }
+                            }
+                            .padding(.bottom, 18)
+                        }
+                    }
+                    .frame(width: panelW)
+
+                    // ─── Sağ: Kamera Takip Paneli ─────────────────────────
+                    if vm.isTrackingEnabled {
+                        CameraTrackingPanel(vm: vm, emotion: emotion)
+                            .frame(width: geometry.size.width - panelW)
+                            .transition(.asymmetric(
+                                insertion: .move(edge: .trailing).combined(with: .opacity),
+                                removal:   .move(edge: .trailing).combined(with: .opacity)
+                            ))
+                    }
+                }
+                .animation(.spring(response: 0.5, dampingFraction: 0.8), value: vm.isTrackingEnabled)
+
+                // Shutter flaşı — tam ekran
                 if vm.camera.shutterFlash {
                     Color.white
                         .ignoresSafeArea()
@@ -205,99 +334,9 @@ struct GismoFaceView: View {
                         .zIndex(9)
                 }
 
-                // Overlay
-                VStack {
-                    HStack(spacing: 12) {
-                        Button { dismiss() } label: {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 15, weight: .bold))
-                                .foregroundColor(.white.opacity(0.9))
-                                .frame(width: 42, height: 42)
-                                .background(Circle().fill(Color.black.opacity(0.28)))
-                        }
-                        .buttonStyle(ScaleButtonStyle())
-                        
-                        Button {
-                            withAnimation { vm.isTrackingEnabled.toggle() }
-                        } label: {
-                            Image(systemName: vm.isTrackingEnabled ? "eye.fill" : "eye.slash.fill")
-                                .font(.system(size: 15, weight: .bold))
-                                .foregroundColor(vm.isTrackingEnabled ? .white : .white.opacity(0.3))
-                                .frame(width: 42, height: 42)
-                                .background(Circle().fill(Color.black.opacity(0.28)))
-                        }
-                        .buttonStyle(ScaleButtonStyle())
-                        
-                        Spacer()
-                        VStack(alignment: .trailing, spacing: 2) {
-                            Text(emotion.title)
-                                .font(.system(size: 18, weight: .black, design: .rounded))
-                                .foregroundColor(.white)
-                            Text(vm.robot.name)
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(.white.opacity(0.58))
-                        }
-                    }
-                    .padding(.horizontal, 22)
-                    .padding(.top, 18)
-
-                    Spacer()
-
-                    // AI yanıt balonu
-                    if vm.showResponse && !vm.aiResponse.isEmpty {
-                        Text(vm.aiResponse)
-                            .font(.system(size: 15, weight: .semibold, design: .rounded))
-                            .foregroundColor(.white)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 12)
-                            .background(
-                                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                    .fill(Color.black.opacity(0.52))
-                                    .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                        .stroke(emotion.primary.opacity(0.4), lineWidth: 1))
-                            )
-                            .padding(.horizontal, 24)
-                            .transition(.opacity.combined(with: .move(edge: .bottom)))
-                    }
-
-                    // Canlı transkript
-                    if !vm.liveTranscript.isEmpty {
-                        Text(vm.liveTranscript)
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.white.opacity(0.4))
-                            .lineLimit(1)
-                            .truncationMode(.head)
-                            .padding(.horizontal, 28)
-                            .transition(.opacity)
-                    }
-
-                    // Durum göstergesi
-                    HStack(spacing: 6) {
-                        if vm.isThinking {
-                            ProgressView().tint(.white.opacity(0.7)).scaleEffect(0.7)
-                            Text("Düşünüyor...")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(.white.opacity(0.5))
-                        } else if vm.permissionDenied {
-                            Image(systemName: "mic.slash").font(.system(size: 12)).foregroundColor(.red.opacity(0.7))
-                            Text("Mikrofon izni gerekli")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(.red.opacity(0.7))
-                        } else {
-                            MicPulseIndicator(isActive: vm.isListening, color: emotion.primary)
-                            Text(vm.isListening ? "Dinliyor" : "Bağlanıyor...")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(.white.opacity(0.45))
-                        }
-                    }
-                    .padding(.bottom, 18)
-                }
-
-                // Fotoğraf önizleme overlay — emotion temasıyla entegre
+                // Fotoğraf önizleme overlay — tam ekran
                 if vm.camera.showPreview, let photo = vm.camera.capturedImage {
                     ZStack {
-                        // Arka plan: emotion rengi + blur
                         emotion.background
                             .ignoresSafeArea()
                             .overlay(
@@ -308,7 +347,6 @@ struct GismoFaceView: View {
                             )
 
                         VStack(spacing: 16) {
-                            // Polaroid çerçeve
                             VStack(spacing: 0) {
                                 Image(uiImage: photo)
                                     .resizable()
@@ -330,7 +368,6 @@ struct GismoFaceView: View {
                             .shadow(color: .black.opacity(0.35), radius: 20, x: 0, y: 8)
                             .rotationEffect(.degrees(-2))
 
-                            // Badge
                             HStack(spacing: 6) {
                                 Image(systemName: "checkmark.circle.fill")
                                     .foregroundColor(emotion.primary)
@@ -787,6 +824,265 @@ struct CameraLensEye: View {
             withAnimation(.easeInOut(duration: 0.4)) { rotating = true }
             withAnimation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true)) { iris = 0.85 }
         }
+    }
+}
+
+// MARK: - ARCameraPreviewView
+
+/// ARKit'in çalışan session'ını paylaşarak kamera görüntüsünü SwiftUI içinde canlı gösterir.
+/// Ayrı bir AVCaptureSession açmaz — mevcut ARSession kullanılır (paralel çalışma).
+private struct ARCameraPreviewView: UIViewRepresentable {
+    let session: ARSession
+
+    func makeUIView(context: Context) -> ARSCNView {
+        let view = ARSCNView(frame: .zero)
+        view.session                      = session
+        view.scene                        = SCNScene()
+        view.automaticallyUpdatesLighting = false
+        view.rendersCameraGrain           = false
+        view.rendersMotionBlur            = false
+        view.backgroundColor              = .black
+        view.showsStatistics              = false
+        return view
+    }
+    func updateUIView(_ uiView: ARSCNView, context: Context) {}
+}
+
+// MARK: - CameraTrackingPanel
+
+/// Kamera takip modu aktifken sağ tarafta gösterilen panel.
+/// ARKit'in mevcut session'ını paylaşarak canlı kamera akışını gösterir,
+/// Vision'dan gelen yüz bbox ve vücut iskeleti üzerine overlay çizer.
+private struct CameraTrackingPanel: View {
+    @ObservedObject var vm: GismoFaceViewModel
+    let emotion: GismoEmotion
+
+    @State private var scanOffset: CGFloat = -1   // scan çizgisi (-1 → +1)
+    @State private var statusPulse = false
+
+    var body: some View {
+        ZStack {
+            // ── Kamera akışı ──────────────────────────────────────────
+            Color.black
+
+            ARCameraPreviewView(session: vm.vision.session)
+
+            // ── Scan çizgisi animasyonu ───────────────────────────────
+            GeometryReader { geo in
+                let lineY = geo.size.height * ((scanOffset + 1) / 2.0)
+                Rectangle()
+                    .fill(
+                        LinearGradient(
+                            colors: [.clear, emotion.primary.opacity(0.65), .clear],
+                            startPoint: .leading, endPoint: .trailing
+                        )
+                    )
+                    .frame(height: 2)
+                    .offset(y: lineY)
+            }
+            .allowsHitTesting(false)
+
+            // ── Yüz konumu göstergesi (ARKit projectPoint ile doğru koordinat) ─
+            if let facePos = vm.vision.faceScreenPosition {
+                GeometryReader { geo in
+                    let cx = facePos.x * geo.size.width
+                    let cy = facePos.y * geo.size.height
+                    // Kutu boyutu: panel yüksekliğinin ~%40'ı
+                    let boxH: CGFloat = geo.size.height * 0.40
+                    let boxW: CGFloat = boxH * 0.78  // yüz ortalama en/boy oranı
+                    let bx = cx - boxW / 2
+                    let by = cy - boxH / 2
+
+                    ZStack {
+                        FaceCornerBracket(x: bx, y: by, width: boxW, height: boxH,
+                                          color: emotion.primary)
+                        Circle()
+                            .fill(emotion.primary)
+                            .frame(width: 8, height: 8)
+                            .shadow(color: emotion.primary.opacity(0.9), radius: 10)
+                            .position(x: cx, y: cy)
+                    }
+                }
+                .allowsHitTesting(false)
+            }
+
+            // ── Vücut iskeleti göstergesi (yüz yoksa) ────────────────
+            if vm.vision.isBodyDetected && !vm.vision.isFaceDetected {
+                GeometryReader { geo in
+                    let cx = ((vm.vision.bodyOffset.x / 2.0) + 0.5) * geo.size.width
+                    VStack(spacing: 5) {
+                        Image(systemName: "figure.stand")
+                            .font(.system(size: 32, weight: .bold))
+                            .foregroundColor(emotion.secondary)
+                            .shadow(color: emotion.secondary.opacity(0.9), radius: 12)
+                        Text("BODY")
+                            .font(.system(size: 9, weight: .black, design: .monospaced))
+                            .foregroundColor(emotion.secondary.opacity(0.85))
+                    }
+                    .position(x: cx, y: geo.size.height * 0.5)
+                }
+                .allowsHitTesting(false)
+            }
+
+            // ── UI overlay (durum + motor) ────────────────────────────
+            VStack(spacing: 0) {
+
+                // Üst durum bandı
+                HStack(spacing: 8) {
+                    HStack(spacing: 5) {
+                        let detected = vm.vision.isFaceDetected || vm.vision.isBodyDetected
+                        Circle()
+                            .fill(
+                                vm.vision.isFaceDetected  ? emotion.primary  :
+                                vm.vision.isBodyDetected  ? emotion.secondary :
+                                Color.gray.opacity(0.4)
+                            )
+                            .frame(width: 7, height: 7)
+                            .shadow(color: detected ? emotion.primary.opacity(0.9) : .clear, radius: 5)
+                            .scaleEffect(statusPulse && detected ? 1.35 : 1.0)
+                            .animation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true), value: statusPulse)
+                        Text(
+                            vm.vision.isFaceDetected ? "YÜZ ALGILANDI" :
+                            vm.vision.isBodyDetected ? "VÜCUT ALGILANDI" :
+                            "TARANIYOR..."
+                        )
+                        .font(.system(size: 10, weight: .black, design: .monospaced))
+                        .foregroundColor(.white.opacity(0.9))
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(
+                        Capsule()
+                            .fill(Color.black.opacity(0.62))
+                            .overlay(Capsule().stroke(emotion.primary.opacity(0.25), lineWidth: 1))
+                    )
+
+                    Spacer()
+
+                    Text("◉ LIVE")
+                        .font(.system(size: 9, weight: .black, design: .monospaced))
+                        .foregroundColor(emotion.primary)
+                        .padding(.horizontal, 8).padding(.vertical, 4)
+                        .background(
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(emotion.primary.opacity(0.12))
+                                .overlay(RoundedRectangle(cornerRadius: 4)
+                                    .stroke(emotion.primary.opacity(0.4), lineWidth: 1))
+                        )
+                }
+                .padding(.horizontal, 12)
+                .padding(.top, 14)
+
+                Spacer()
+
+                // Alt motor komut göstergesi
+                HStack(spacing: 22) {
+                    Image(systemName: "arrow.left")
+                        .font(.system(size: 18, weight: .black))
+                        .foregroundColor(vm.currentTrackingCommand == .right
+                                         ? emotion.primary : .white.opacity(0.15))
+                        .shadow(color: vm.currentTrackingCommand == .right
+                                ? emotion.primary : .clear, radius: 12)
+                        .scaleEffect(vm.currentTrackingCommand == .right ? 1.4 : 1.0)
+                        .animation(.spring(response: 0.2, dampingFraction: 0.55), value: vm.currentTrackingCommand)
+
+                    VStack(spacing: 3) {
+                        Image(systemName: vm.currentTrackingCommand == .stop
+                              ? "dot.radiowaves.left.and.right"
+                              : "arrow.triangle.2.circlepath")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundColor(emotion.primary.opacity(
+                                vm.currentTrackingCommand == .stop ? 0.5 : 1.0
+                            ))
+                        Text(vm.currentTrackingCommand == .stop ? "MERKEZİ" : "TAKİP")
+                            .font(.system(size: 8, weight: .black, design: .monospaced))
+                            .foregroundColor(.white.opacity(0.45))
+                    }
+                    .animation(.easeInOut(duration: 0.15), value: vm.currentTrackingCommand)
+
+                    Image(systemName: "arrow.right")
+                        .font(.system(size: 18, weight: .black))
+                        .foregroundColor(vm.currentTrackingCommand == .left
+                                         ? emotion.primary : .white.opacity(0.15))
+                        .shadow(color: vm.currentTrackingCommand == .left
+                                ? emotion.primary : .clear, radius: 12)
+                        .scaleEffect(vm.currentTrackingCommand == .left ? 1.4 : 1.0)
+                        .animation(.spring(response: 0.2, dampingFraction: 0.55), value: vm.currentTrackingCommand)
+                }
+                .padding(.vertical, 11)
+                .padding(.horizontal, 22)
+                .background(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(Color.black.opacity(0.68))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .stroke(emotion.primary.opacity(0.22), lineWidth: 1)
+                        )
+                )
+                .shadow(color: emotion.primary.opacity(0.18), radius: 14)
+                .padding(.bottom, 18)
+            }
+
+            // Sol kenar neon çizgisi (yüz paneli ile birleşim noktası)
+            HStack {
+                Rectangle()
+                    .fill(
+                        LinearGradient(
+                            colors: [emotion.primary.opacity(0.95), emotion.secondary.opacity(0.3)],
+                            startPoint: .top, endPoint: .bottom
+                        )
+                    )
+                    .frame(width: 2)
+                Spacer()
+            }
+            .allowsHitTesting(false)
+        }
+        .onAppear {
+            withAnimation(.linear(duration: 2.4).repeatForever(autoreverses: true)) {
+                scanOffset = 1
+            }
+            statusPulse = true
+        }
+    }
+}
+
+// MARK: - FaceCornerBracket
+
+/// Vision yüz bounding box'ını köşe braket çizgisiyle gösterir.
+private struct FaceCornerBracket: View {
+    let x: CGFloat
+    let y: CGFloat
+    let width: CGFloat
+    let height: CGFloat
+    let color: Color
+
+    private let arm: CGFloat = 18
+    private let lw:  CGFloat = 2.5
+
+    var body: some View {
+        ZStack {
+            cornerPath(fromX: x,         fromY: y,          dx: 1,  dy: 1)   // sol-üst
+            cornerPath(fromX: x + width, fromY: y,          dx: -1, dy: 1)   // sağ-üst
+            cornerPath(fromX: x,         fromY: y + height, dx: 1,  dy: -1)  // sol-alt
+            cornerPath(fromX: x + width, fromY: y + height, dx: -1, dy: -1)  // sağ-alt
+            // Yarı-şeffaf dolgu
+            Rectangle()
+                .fill(color.opacity(0.05))
+                .frame(width: width, height: height)
+                .position(x: x + width / 2, y: y + height / 2)
+        }
+        .shadow(color: color.opacity(0.55), radius: 8)
+    }
+
+    @ViewBuilder
+    private func cornerPath(fromX cx: CGFloat, fromY cy: CGFloat,
+                             dx: CGFloat, dy: CGFloat) -> some View {
+        Path { p in
+            p.move(to:    CGPoint(x: cx,        y: cy + arm * dy))
+            p.addLine(to: CGPoint(x: cx,        y: cy))
+            p.addLine(to: CGPoint(x: cx + arm * dx, y: cy))
+        }
+        .stroke(color, style: StrokeStyle(lineWidth: lw, lineCap: .round, lineJoin: .round))
     }
 }
 
