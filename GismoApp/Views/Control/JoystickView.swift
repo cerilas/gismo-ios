@@ -5,9 +5,9 @@ struct JoystickView: View {
     var onCommand: (RobotCommand) -> Void
 
     // Layout constants
-    private let outerSize: CGFloat  = 260
-    private let knobSize: CGFloat   = 100
-    private let maxRadius: CGFloat  = 70
+    private let outerSize: CGFloat  = 276
+    private let knobSize: CGFloat   = 104
+    private let maxRadius: CGFloat  = 74
 
     @State private var knobOffset: CGSize = .zero
     @State private var isDragging = false
@@ -15,57 +15,123 @@ struct JoystickView: View {
 
     var body: some View {
         ZStack {
-            // Outer ring
+            // Ambient glow when active
             Circle()
-                .fill(Color.gSurface)
+                .fill(
+                    RadialGradient(
+                        colors: [
+                            Color.gAccent2.opacity(isDragging ? 0.25 : 0.06),
+                            Color.gAccent.opacity(isDragging ? 0.14 : 0.02),
+                            .clear
+                        ],
+                        center: .center,
+                        startRadius: 20,
+                        endRadius: 165
+                    )
+                )
+                .frame(width: outerSize + 44, height: outerSize + 44)
+
+            // Outer tactical telemetry ring (dashed)
+            Circle()
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            Color.gAccent2.opacity(isDragging ? 0.55 : 0.22),
+                            Color.gAccent.opacity(isDragging ? 0.45 : 0.14)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    style: StrokeStyle(lineWidth: 1.4, dash: [4, 8])
+                )
+                .frame(width: outerSize + 18, height: outerSize + 18)
+
+            // Main housing base
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [Color(hex: "101322"), Color.gSurface.opacity(0.96)],
+                        center: .center,
+                        startRadius: 10,
+                        endRadius: outerSize / 2
+                    )
+                )
                 .frame(width: outerSize, height: outerSize)
                 .overlay(
                     Circle()
                         .stroke(
                             LinearGradient(
                                 colors: [
-                                    Color.gAccent.opacity(isDragging ? 0.5 : 0.2),
-                                    Color.gAccent2.opacity(isDragging ? 0.3 : 0.1)
+                                    Color.gAccent2.opacity(isDragging ? 0.65 : 0.25),
+                                    Color.gAccent.opacity(isDragging ? 0.45 : 0.12)
                                 ],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             ),
-                            lineWidth: 1.5
+                            lineWidth: 1.8
                         )
                 )
-                .shadow(color: Color.gAccent.opacity(isDragging ? 0.2 : 0), radius: 20)
+                .shadow(color: Color.black.opacity(0.45), radius: 22, x: 0, y: 12)
+
+            // Inner crosshair & deadzone ring
+            Circle()
+                .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                .frame(width: outerSize * 0.56, height: outerSize * 0.56)
 
             // Directional arrows (background guides)
             ForEach(Direction.allCases) { dir in
                 directionArrow(dir)
             }
 
-            // Knob
-            Circle()
-                .fill(
-                    isDragging
-                        ? LinearGradient.accent
-                        : LinearGradient(colors: [Color.gSurface2, Color.gSurface],
-                                        startPoint: .topLeading, endPoint: .bottomTrailing)
-                )
-                .frame(width: knobSize, height: knobSize)
-                .overlay(
-                    Circle()
-                        .stroke(
-                            isDragging
-                                ? Color.white.opacity(0.2)
-                                : Color.gBorder,
-                            lineWidth: 1.5
-                        )
-                )
-                .overlay(
-                    Image(systemName: "circle.grid.cross.fill")
-                        .font(.system(size: 28, weight: .light))
-                        .foregroundColor(isDragging ? .white.opacity(0.9) : .gSubtext)
-                )
-                .shadow(color: isDragging ? Color.gAccent.opacity(0.4) : .clear, radius: 20)
-                .offset(knobOffset)
-                .animation(.interactiveSpring(response: 0.25, dampingFraction: 0.75), value: knobOffset)
+            // Tactile Core Knob
+            ZStack {
+                Circle()
+                    .fill(
+                        isDragging
+                            ? LinearGradient(
+                                colors: [Color.gAccent, Color.gAccent2],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                            : LinearGradient(
+                                colors: [Color.gSurface2, Color(hex: "121526")],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                    )
+                    .frame(width: knobSize, height: knobSize)
+                    .overlay(
+                        Circle()
+                            .stroke(
+                                LinearGradient(
+                                    colors: [
+                                        isDragging ? Color.white.opacity(0.55) : Color.white.opacity(0.18),
+                                        isDragging ? Color.gCyan.opacity(0.4) : Color.white.opacity(0.04)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 1.8
+                            )
+                    )
+                    .shadow(
+                        color: isDragging ? Color.gAccent2.opacity(0.50) : Color.black.opacity(0.45),
+                        radius: isDragging ? 20 : 12,
+                        x: 0,
+                        y: isDragging ? 0 : 6
+                    )
+
+                // Inner precision ring on knob
+                Circle()
+                    .stroke(Color.white.opacity(isDragging ? 0.25 : 0.08), lineWidth: 1)
+                    .frame(width: knobSize - 22, height: knobSize - 22)
+
+                Image(systemName: isDragging ? command.systemIcon : "scope")
+                    .font(.system(size: 26, weight: .bold))
+                    .foregroundColor(isDragging ? .white : .gAccent2.opacity(0.85))
+            }
+            .offset(knobOffset)
+            .animation(.interactiveSpring(response: 0.22, dampingFraction: 0.74), value: knobOffset)
         }
         .gesture(
             DragGesture(minimumDistance: 4, coordinateSpace: .local)
@@ -80,7 +146,6 @@ struct JoystickView: View {
                     )
                     knobOffset = offset
 
-                    // Compute command
                     let normalized = CGSize(
                         width:  translation.width  / maxRadius,
                         height: translation.height / maxRadius
@@ -126,15 +191,24 @@ struct JoystickView: View {
     // MARK: - Direction Arrows
 
     private func directionArrow(_ dir: Direction) -> some View {
-        let iconSize: CGFloat = 18
+        let active = isActive(dir)
         let iconInset: CGFloat = outerSize / 2 - 28
 
-        return Image(systemName: dir.icon)
-            .font(.system(size: iconSize, weight: .semibold))
-            .foregroundColor(isActive(dir) ? .gAccent : Color.gSubtext.opacity(0.3))
-            .offset(x: dir.offsetX * iconInset / outerSize * outerSize,
-                    y: dir.offsetY * iconInset / outerSize * outerSize)
-            .animation(.easeInOut(duration: 0.1), value: command)
+        return ZStack {
+            if active {
+                Circle()
+                    .fill(Color.gCyan.opacity(0.18))
+                    .frame(width: 34, height: 34)
+                    .blur(radius: 4)
+            }
+            Image(systemName: dir.icon)
+                .font(.system(size: 18, weight: .black))
+                .foregroundColor(active ? .gCyan : Color.gSubtext.opacity(0.32))
+                .scaleEffect(active ? 1.22 : 1.0)
+        }
+        .offset(x: dir.offsetX * iconInset,
+                y: dir.offsetY * iconInset)
+        .animation(.spring(response: 0.2, dampingFraction: 0.65), value: command)
     }
 
     private func isActive(_ dir: Direction) -> Bool {

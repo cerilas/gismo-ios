@@ -8,6 +8,7 @@ struct ControlView: View {
     @State private var joystickAppeared = false
     @State private var commandPulse = false
     @State private var showAPModeConfirmation = false
+    @State private var showFaceMode = false
 
     init(robot: Robot) {
         self.robot = robot
@@ -22,11 +23,11 @@ struct ControlView: View {
                 // Header
                 controlHeader
 
-                Spacer()
+                Spacer(minLength: 10)
 
                 // Status & Command Display
                 commandDisplay
-                    .padding(.horizontal, 24)
+                    .padding(.horizontal, 20)
                     .opacity(joystickAppeared ? 1 : 0)
 
                 Spacer()
@@ -36,17 +37,20 @@ struct ControlView: View {
 
                 Spacer()
 
-                // Quick action buttons
+                // Quick action buttons & Telemetry Log
                 quickActions
 
-                Spacer(minLength: 40)
+                Spacer(minLength: 32)
             }
         }
+        .fullScreenCover(isPresented: $showFaceMode) {
+            GismoFaceView(robot: robot)
+        }
         .onAppear {
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.8).delay(0.1)) {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.8).delay(0.08)) {
                 headerAppeared = true
             }
-            withAnimation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.3)) {
+            withAnimation(.spring(response: 0.6, dampingFraction: 0.72).delay(0.22)) {
                 joystickAppeared = true
             }
         }
@@ -66,122 +70,170 @@ struct ControlView: View {
         HStack(spacing: 14) {
             Button { dismiss() } label: {
                 Image(systemName: "chevron.left")
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.system(size: 16, weight: .bold))
                     .foregroundColor(.white)
-                    .frame(width: 40, height: 40)
-                    .background(Circle().fill(Color.gSurface2))
+                    .frame(width: 44, height: 44)
+                    .background(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(Color.gSurface2)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .stroke(Color.gBorder, lineWidth: 1)
+                            )
+                    )
             }
             .buttonStyle(ScaleButtonStyle())
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(robot.name)
-                    .font(.system(size: 20, weight: .bold))
+                    .font(.system(size: 20, weight: .black, design: .rounded))
                     .foregroundColor(.white)
+                    .lineLimit(1)
                 StatusBadge(isOnline: viewModel.isConnected)
             }
 
             Spacer()
 
-            // Signal indicator
-            VStack(spacing: 2) {
-                Image(systemName: "wifi")
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(LinearGradient.accent)
-                Text("Internet")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(.gSubtext)
+            // Quick switch to Gismo AI Face Mode
+            Button {
+                showFaceMode = true
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 13, weight: .bold))
+                    Text("Yüz Modu")
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                }
+                .foregroundColor(.black)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(
+                    Capsule()
+                        .fill(LinearGradient.cyberCyan)
+                        .shadow(color: Color.gSuccess.opacity(0.3), radius: 8, x: 0, y: 4)
+                )
             }
+            .buttonStyle(ScaleButtonStyle())
         }
         .padding(.horizontal, 20)
-        .padding(.top, 60)
-        .padding(.bottom, 16)
+        .padding(.top, 56)
+        .padding(.bottom, 12)
         .opacity(headerAppeared ? 1 : 0)
         .offset(y: headerAppeared ? 0 : -20)
     }
 
-    // MARK: - Command Display
+    // MARK: - Command Telemetry Display
 
     private var commandDisplay: some View {
         VStack(spacing: 10) {
-            HStack(spacing: 0) {
-                // Current command
-                VStack(spacing: 6) {
-                    Text("Komut")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(.gSubtext)
-                        .tracking(1)
+            HStack(spacing: 12) {
+                // Current command card
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(viewModel.currentCommand == .stop ? Color.gSubtext : Color.gCyan)
+                            .frame(width: 6, height: 6)
+                        Text("AKTİF VEKTÖR")
+                            .font(.system(size: 10, weight: .black, design: .monospaced))
+                            .foregroundColor(.gSubtext)
+                            .tracking(1)
+                    }
 
-                    HStack(spacing: 8) {
-                        Image(systemName: viewModel.currentCommand.systemIcon)
-                            .font(.system(size: 22, weight: .bold))
-                            .foregroundStyle(
-                                viewModel.currentCommand == .stop
-                                    ? AnyShapeStyle(Color.gSubtext)
-                                    : AnyShapeStyle(LinearGradient.accent)
-                            )
-                            .scaleEffect(commandPulse ? 1.15 : 1.0)
-                            .animation(.spring(response: 0.2), value: commandPulse)
+                    HStack(spacing: 10) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .fill(
+                                    viewModel.currentCommand == .stop
+                                        ? Color.white.opacity(0.05)
+                                        : Color.gAccent2.opacity(0.18)
+                                )
+                                .frame(width: 40, height: 40)
+
+                            Image(systemName: viewModel.currentCommand.systemIcon)
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundStyle(
+                                    viewModel.currentCommand == .stop
+                                        ? AnyShapeStyle(Color.gSubtext)
+                                        : AnyShapeStyle(LinearGradient.cyberCyan)
+                                )
+                                .scaleEffect(commandPulse ? 1.18 : 1.0)
+                                .animation(.spring(response: 0.2), value: commandPulse)
+                        }
 
                         Text(viewModel.currentCommand.displayName)
-                            .font(.system(size: 22, weight: .black, design: .rounded))
+                            .font(.system(size: 20, weight: .black, design: .rounded))
                             .foregroundColor(viewModel.currentCommand == .stop ? .gSubtext : .white)
+                            .lineLimit(1)
                     }
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(15)
                 .background(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(Color.gSurface)
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .fill(Color.gSurface.opacity(0.9))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            RoundedRectangle(cornerRadius: 20, style: .continuous)
                                 .stroke(
-                                    viewModel.currentCommand == .stop ? Color.gBorder : Color.gAccent.opacity(0.4),
-                                    lineWidth: 1
+                                    viewModel.currentCommand == .stop
+                                        ? Color.gBorder
+                                        : Color.gCyan.opacity(0.45),
+                                    lineWidth: 1.2
                                 )
                         )
                 )
 
-                Spacer().frame(width: 12)
-
-                // Last command time
-                VStack(spacing: 6) {
-                    Text("Son Komut")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(.gSubtext)
-                        .tracking(1)
-
-                    if let t = viewModel.lastCommandTime {
-                        Text(t, style: .relative)
-                            .font(.system(size: 15, weight: .bold, design: .monospaced))
-                            .foregroundColor(.white)
-                    } else {
-                        Text("—")
-                            .font(.system(size: 20, weight: .bold))
+                // Last command time card
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "clock.arrow.circlepath")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(.gAccent2)
+                        Text("SON SİNYAL")
+                            .font(.system(size: 10, weight: .black, design: .monospaced))
                             .foregroundColor(.gSubtext)
+                            .tracking(1)
                     }
+
+                    HStack {
+                        if let t = viewModel.lastCommandTime {
+                            Text(t, style: .relative)
+                                .font(.system(size: 15, weight: .bold, design: .monospaced))
+                                .foregroundColor(.white)
+                                .lineLimit(1)
+                        } else {
+                            Text("Bekleniyor...")
+                                .font(.system(size: 15, weight: .bold, design: .rounded))
+                                .foregroundColor(.gSubtext.opacity(0.7))
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    .frame(height: 40)
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(15)
                 .background(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(Color.gSurface)
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .fill(Color.gSurface.opacity(0.9))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            RoundedRectangle(cornerRadius: 20, style: .continuous)
                                 .stroke(Color.gBorder, lineWidth: 1)
                         )
                 )
             }
 
             if let errorMessage = viewModel.errorMessage {
-                Text(errorMessage)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(.gDanger)
-                    .multilineTextAlignment(.center)
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 12))
+                    Text(errorMessage)
+                        .font(.system(size: 12, weight: .semibold))
+                }
+                .foregroundColor(.gDanger)
+                .padding(.top, 2)
             } else if let commandStatusMessage = viewModel.commandStatusMessage {
                 Text(commandStatusMessage)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.system(size: 12, weight: .medium))
                     .foregroundColor(.gSubtext)
-                    .multilineTextAlignment(.center)
             }
         }
         .onChange(of: viewModel.currentCommand) { _ in
@@ -197,61 +249,71 @@ struct ControlView: View {
             JoystickView(command: $viewModel.currentCommand) { cmd in
                 viewModel.sendCommand(cmd)
             }
-            .scaleEffect(joystickAppeared ? 1 : 0.6)
+            .scaleEffect(joystickAppeared ? 1 : 0.65)
             .opacity(joystickAppeared ? 1 : 0)
 
-            Text("Sürükle ve yönlendir")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundColor(.gSubtext)
-                .opacity(joystickAppeared ? 1 : 0)
+            HStack(spacing: 6) {
+                Image(systemName: "hand.draw.fill")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.gAccent2)
+                Text("Analog çekirdeği sürükleyerek yönlendirin")
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .foregroundColor(.gSubtext)
+            }
+            .opacity(joystickAppeared ? 1 : 0)
         }
     }
 
-    // MARK: - Quick Actions
+    // MARK: - Quick Actions & Command Log
 
     private var quickActions: some View {
-        HStack(spacing: 14) {
-            // Stop button
+        HStack(spacing: 12) {
+            // Emergency Stop button
             Button {
                 viewModel.stopRobot()
                 let g = UIImpactFeedbackGenerator(style: .heavy)
                 g.impactOccurred()
             } label: {
                 VStack(spacing: 6) {
-                    Image(systemName: "stop.fill")
-                        .font(.system(size: 22, weight: .bold))
+                    Image(systemName: "octagon.fill")
+                        .font(.system(size: 20, weight: .bold))
                         .foregroundColor(.white)
-                    Text("STOP")
-                        .font(.system(size: 11, weight: .black))
-                        .tracking(1)
+                    Text("DURDUR")
+                        .font(.system(size: 10, weight: .black, design: .monospaced))
+                        .tracking(0.8)
                         .foregroundColor(.white)
                 }
-                .frame(width: 80, height: 72)
+                .frame(width: 78, height: 74)
                 .background(
                     RoundedRectangle(cornerRadius: 20, style: .continuous)
                         .fill(LinearGradient.dangerGradient)
-                        .shadow(color: Color.gDanger.opacity(0.3), radius: 12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                .stroke(Color.white.opacity(0.22), lineWidth: 1)
+                        )
+                        .shadow(color: Color.gDanger.opacity(0.35), radius: 12, x: 0, y: 6)
                 )
             }
             .buttonStyle(ScaleButtonStyle())
 
+            // AP Reset button
             Button {
                 showAPModeConfirmation = true
             } label: {
                 VStack(spacing: 6) {
-                    Image(systemName: "wifi.exclamationmark")
-                        .font(.system(size: 22, weight: .bold))
-                        .foregroundColor(.white)
-                    Text("AP")
-                        .font(.system(size: 11, weight: .black))
-                        .tracking(1)
-                        .foregroundColor(.white)
+                    Image(systemName: "antenna.radiowaves.left.and.right")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundColor(.black)
+                    Text("AP MOD")
+                        .font(.system(size: 10, weight: .black, design: .monospaced))
+                        .tracking(0.8)
+                        .foregroundColor(.black)
                 }
-                .frame(width: 80, height: 72)
+                .frame(width: 78, height: 74)
                 .background(
                     RoundedRectangle(cornerRadius: 20, style: .continuous)
                         .fill(Color.gWarning)
-                        .shadow(color: Color.gWarning.opacity(0.25), radius: 12)
+                        .shadow(color: Color.gWarning.opacity(0.28), radius: 12, x: 0, y: 6)
                 )
             }
             .buttonStyle(ScaleButtonStyle())
@@ -259,48 +321,55 @@ struct ControlView: View {
             .opacity(viewModel.isConnected ? 1 : 0.45)
 
             // Command Log
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Komut Geçmişi")
-                    .font(.system(size: 11, weight: .semibold))
+            VStack(alignment: .leading, spacing: 8) {
+                Text("KOMUT TELEMETRİSİ")
+                    .font(.system(size: 9, weight: .black, design: .monospaced))
                     .foregroundColor(.gSubtext)
                     .tracking(1)
 
                 if viewModel.commandLog.isEmpty {
-                    Text("Henüz komut yok")
-                        .font(.system(size: 13))
-                        .foregroundColor(.gSubtext)
+                    Text("Henüz hareket komutu gönderilmedi")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.gSubtext.opacity(0.75))
                 } else {
-                    HStack(spacing: 6) {
-                        ForEach(viewModel.commandLog.prefix(6)) { entry in
-                            Text(entry.command.rawValue)
-                                .font(.system(size: 13, weight: .bold, design: .monospaced))
-                                .foregroundColor(.gAccent)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(
-                                    Capsule()
-                                        .fill(Color.gAccent.opacity(0.12))
-                                )
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 6) {
+                            ForEach(viewModel.commandLog.prefix(8)) { entry in
+                                Text(entry.command.rawValue)
+                                    .font(.system(size: 12, weight: .black, design: .monospaced))
+                                    .foregroundColor(.gCyan)
+                                    .padding(.horizontal, 9)
+                                    .padding(.vertical, 5)
+                                    .background(
+                                        Capsule()
+                                            .fill(Color.gCyan.opacity(0.12))
+                                            .overlay(
+                                                Capsule()
+                                                    .stroke(Color.gCyan.opacity(0.28), lineWidth: 1)
+                                            )
+                                    )
+                            }
                         }
                     }
                 }
             }
-            .frame(maxWidth: .infinity)
-            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(height: 74)
+            .padding(.horizontal, 14)
             .background(
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(Color.gSurface)
+                    .fill(Color.gSurface.opacity(0.9))
                     .overlay(
                         RoundedRectangle(cornerRadius: 20, style: .continuous)
                             .stroke(Color.gBorder, lineWidth: 1)
                     )
             )
         }
-        .padding(.horizontal, 24)
+        .padding(.horizontal, 20)
         .opacity(joystickAppeared ? 1 : 0)
     }
 }
 
 #Preview {
-    ControlView(robot: Robot.mockRobots[0])
+    ControlView(robot: Robot(name: "Gismo", ipAddress: "192.168.1.42", isOnline: true))
 }

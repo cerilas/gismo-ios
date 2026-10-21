@@ -50,9 +50,19 @@ final class GismoCameraService: NSObject, ObservableObject {
             }
         }
 
-        // Fotoğraf çek
+        // Fotoğraf çek (cihazın mevcut landscape yönünü uygula)
+        let currentOrientation = Self.currentVideoOrientation()
         let image = await withCheckedContinuation { cont in
             self.continuation = cont
+            if let connection = self.photoOutput.connection(with: .video) {
+                if connection.isVideoOrientationSupported {
+                    connection.videoOrientation = currentOrientation
+                }
+                if connection.isVideoMirroringSupported {
+                    connection.automaticallyAdjustsVideoMirroring = false
+                    connection.isVideoMirrored = true
+                }
+            }
             let settings = AVCapturePhotoSettings()
             settings.flashMode = .off
             self.photoOutput.capturePhoto(with: settings, delegate: self)
@@ -81,7 +91,10 @@ final class GismoCameraService: NSObject, ObservableObject {
 
         // Galeriye kaydet
         if photoOK {
-            await saveToLibrary(image)
+            await Self.saveToPhotoLibrary(image)
+        } else {
+            // İzin durumu belirsizse fallback olarak dene
+            UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
         }
 
         // 3 sn sonra kapat
@@ -98,6 +111,23 @@ final class GismoCameraService: NSObject, ObservableObject {
 
     // MARK: - Private
 
+    private static func currentVideoOrientation() -> AVCaptureVideoOrientation {
+        let interfaceOrientation = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first?.interfaceOrientation ?? .landscapeRight
+
+        switch interfaceOrientation {
+        case .landscapeLeft:
+            return .landscapeLeft
+        case .landscapeRight:
+            return .landscapeRight
+        case .portraitUpsideDown:
+            return .portraitUpsideDown
+        default:
+            return .landscapeRight
+        }
+    }
+
     private func setupSession() {
         guard session.inputs.isEmpty else { return }
         session.beginConfiguration()
@@ -113,19 +143,32 @@ final class GismoCameraService: NSObject, ObservableObject {
             session.addOutput(photoOutput)
         }
 
-        // Ayna efektini kaldır (selfie doğal görünsün)
-        photoOutput.connection(with: .video)?.isVideoMirrored = true
+        if let connection = photoOutput.connection(with: .video) {
+            if connection.isVideoOrientationSupported {
+                connection.videoOrientation = Self.currentVideoOrientation()
+            }
+            if connection.isVideoMirroringSupported {
+                connection.automaticallyAdjustsVideoMirroring = false
+                connection.isVideoMirrored = true
+            }
+        }
 
         session.commitConfiguration()
     }
 
-    private func saveToLibrary(_ image: UIImage) async {
+    static func saveToPhotoLibrary(_ image: UIImage) async {
         await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
             PHPhotoLibrary.shared().performChanges({
                 PHAssetChangeRequest.creationRequestForAsset(from: image)
             }) { success, error in
-                if success { print("[Camera] Galeriye kaydedildi") }
-                else { print("[Camera] Kayıt hatası: \(error?.localizedDescription ?? "")") }
+                if success {
+                    print("[Camera] Galeriye kaydedildi")
+                } else {
+                    print("[Camera] PHPhotoLibrary kayıt hatası (\(error?.localizedDescription ?? "")), fallback deneniyor...")
+                    DispatchQueue.main.async {
+                        UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
+                    }
+                }
                 cont.resume()
             }
         }
@@ -144,18 +187,26 @@ final class GismoCameraService: NSObject, ObservableObject {
         }
     }
 
-    private func requestPhotoLibrary() async -> Bool {
+    static func requestPhotoLibraryPermission() async -> Bool {
         await withCheckedContinuation { cont in
-            let status = PHPhotoLibrary.authorizationStatus(for: .addOnly)
-            switch status {
-            case .authorized, .limited:  cont.resume(returning: true)
-            case .notDetermined:
+            let addStatus = PHPhotoLibrary.authorizationStatus(for: .addOnly)
+            let rwStatus  = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+            if addStatus == .authorized || addStatus == .limited || rwStatus == .authorized || rwStatus == .limited {
+                cont.resume(returning: true)
+                return
+            }
+            if addStatus == .notDetermined {
                 PHPhotoLibrary.requestAuthorization(for: .addOnly) { s in
                     cont.resume(returning: s == .authorized || s == .limited)
                 }
-            default:  cont.resume(returning: false)
+            } else {
+                cont.resume(returning: false)
             }
         }
+    }
+
+    private func requestPhotoLibrary() async -> Bool {
+        await Self.requestPhotoLibraryPermission()
     }
 }
 

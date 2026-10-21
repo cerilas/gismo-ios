@@ -177,8 +177,8 @@ struct WiFiNetworkRow: View {
                     Text("•")
                         .foregroundColor(.gSubtext)
                         .font(.system(size: 10))
-                    Text("\(network.rssi) dBm")
-                        .font(.system(size: 12, design: .monospaced))
+                    Text(network.signalBars >= 3 ? "Güçlü sinyal" : (network.signalBars == 2 ? "Orta sinyal" : "Zayıf sinyal"))
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
                         .foregroundColor(.gSubtext)
                 }
             }

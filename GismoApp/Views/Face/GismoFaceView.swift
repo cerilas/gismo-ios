@@ -201,62 +201,125 @@ struct GismoFaceView: View {
                             }
                             .animation(.spring(response: 0.4, dampingFraction: 0.65), value: vm.camera.lensMode)
                             .offset(y: canvasSize * emotion.eyeYOffsetRatio)
-                            GismoMouth(emotion: emotion, size: canvasSize)
+                            GismoMouth(
+                                emotion: emotion,
+                                size: canvasSize,
+                                isSpeaking: vm.isSpeaking,
+                                speechLevel: vm.speechLevel
+                            )
                                 .offset(y: canvasSize * emotion.mouthYOffsetRatio)
                             Spacer(minLength: canvasSize * 0.02)
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                        // Üst butonlar + duygu + durum
+                        // Üst butonlar + duygu + durum (Futuristic Cyber HUD)
                         VStack {
-                            HStack(spacing: 12) {
+                            HStack(spacing: 10) {
                                 Button { dismiss() } label: {
                                     Image(systemName: "xmark")
-                                        .font(.system(size: 15, weight: .bold))
+                                        .font(.system(size: 14, weight: .bold))
                                         .foregroundColor(.white.opacity(0.9))
-                                        .frame(width: 42, height: 42)
-                                        .background(Circle().fill(Color.black.opacity(0.28)))
+                                        .frame(width: 40, height: 40)
+                                        .background(
+                                            Circle()
+                                                .fill(Color.black.opacity(0.38))
+                                                .overlay(Circle().stroke(Color.white.opacity(0.14), lineWidth: 1))
+                                        )
                                 }
                                 .buttonStyle(ScaleButtonStyle())
 
-                                // Göz ikonu — aktifken neon halka
+                                // Göz / Yüz Takip Butonu — aktifken neon halka + etiket
                                 Button {
                                     withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
                                         vm.isTrackingEnabled.toggle()
                                     }
                                 } label: {
-                                    Image(systemName: vm.isTrackingEnabled ? "eye.fill" : "eye.slash.fill")
-                                        .font(.system(size: 15, weight: .bold))
-                                        .foregroundColor(vm.isTrackingEnabled ? emotion.primary : .white.opacity(0.3))
-                                        .frame(width: 42, height: 42)
-                                        .background(Circle().fill(
-                                            vm.isTrackingEnabled
-                                                ? emotion.primary.opacity(0.18)
-                                                : Color.black.opacity(0.28)
-                                        ))
-                                        .overlay(
+                                    HStack(spacing: 6) {
+                                        Image(systemName: vm.isTrackingEnabled ? "viewfinder" : "eye.slash.fill")
+                                            .font(.system(size: 14, weight: .bold))
+                                        Text(vm.isTrackingEnabled ? "TAKİP AÇIK" : "TAKİP")
+                                            .font(.system(size: 10, weight: .black, design: .monospaced))
+                                    }
+                                    .foregroundColor(vm.isTrackingEnabled ? emotion.primary : .white.opacity(0.45))
+                                    .padding(.horizontal, 12)
+                                    .frame(height: 40)
+                                    .background(
+                                        Capsule()
+                                            .fill(
+                                                vm.isTrackingEnabled
+                                                    ? emotion.primary.opacity(0.18)
+                                                    : Color.black.opacity(0.38)
+                                            )
+                                    )
+                                    .overlay(
+                                        Capsule()
+                                            .stroke(
+                                                vm.isTrackingEnabled ? emotion.primary.opacity(0.8) : Color.white.opacity(0.12),
+                                                lineWidth: 1.3
+                                            )
+                                            .shadow(color: emotion.primary.opacity(vm.isTrackingEnabled ? 0.55 : 0), radius: 6)
+                                    )
+                                }
+                                .buttonStyle(ScaleButtonStyle())
+
+                                // Ses testi ikonu — dokunulduğunda Gismo sevimli robotik sesiyle konuşur
+                                Button {
+                                    vm.speakDemoGreeting()
+                                } label: {
+                                    Image(systemName: vm.isSpeaking ? "waveform" : "speaker.wave.2.fill")
+                                        .font(.system(size: 14, weight: .bold))
+                                        .foregroundColor(vm.isSpeaking ? emotion.primary : .white.opacity(0.8))
+                                        .frame(width: 40, height: 40)
+                                        .background(
                                             Circle()
-                                                .stroke(
-                                                    vm.isTrackingEnabled ? emotion.primary.opacity(0.8) : .clear,
-                                                    lineWidth: 1.5
+                                                .fill(
+                                                    vm.isSpeaking
+                                                        ? emotion.primary.opacity(0.18)
+                                                        : Color.black.opacity(0.38)
                                                 )
-                                                .shadow(color: emotion.primary.opacity(vm.isTrackingEnabled ? 0.6 : 0), radius: 6)
+                                                .overlay(
+                                                    Circle()
+                                                        .stroke(
+                                                            vm.isSpeaking ? emotion.primary.opacity(0.7) : Color.white.opacity(0.12),
+                                                            lineWidth: 1
+                                                        )
+                                                )
                                         )
                                 }
                                 .buttonStyle(ScaleButtonStyle())
 
                                 Spacer()
-                                VStack(alignment: .trailing, spacing: 2) {
-                                    Text(emotion.title)
-                                        .font(.system(size: 18, weight: .black, design: .rounded))
-                                        .foregroundColor(.white)
-                                    Text(vm.robot.name)
-                                        .font(.system(size: 12, weight: .semibold))
-                                        .foregroundColor(.white.opacity(0.58))
+
+                                // Sağ üst: Duygu & Robot Durum Rozeti
+                                HStack(spacing: 8) {
+                                    VStack(alignment: .trailing, spacing: 1) {
+                                        Text(emotion.title)
+                                            .font(.system(size: 15, weight: .black, design: .rounded))
+                                            .foregroundColor(.white)
+                                        Text(vm.robot.name.uppercased())
+                                            .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                            .foregroundColor(emotion.primary.opacity(0.85))
+                                            .tracking(0.8)
+                                    }
+
+                                    Circle()
+                                        .fill(emotion.primary)
+                                        .frame(width: 8, height: 8)
+                                        .shadow(color: emotion.primary, radius: 6)
                                 }
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 7)
+                                .background(
+                                    Capsule()
+                                        .fill(Color.black.opacity(0.36))
+                                        .overlay(
+                                            Capsule()
+                                                .stroke(emotion.primary.opacity(0.28), lineWidth: 1)
+                                        )
+                                )
                             }
                             .padding(.horizontal, 22)
-                            .padding(.top, 18)
+                            .padding(.top, 16)
 
                             Spacer()
 
@@ -266,13 +329,23 @@ struct GismoFaceView: View {
                                     .font(.system(size: 15, weight: .semibold, design: .rounded))
                                     .foregroundColor(.white)
                                     .multilineTextAlignment(.center)
-                                    .padding(.horizontal, 20)
-                                    .padding(.vertical, 12)
+                                    .padding(.horizontal, 22)
+                                    .padding(.vertical, 13)
                                     .background(
-                                        RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                            .fill(Color.black.opacity(0.52))
-                                            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                                .stroke(emotion.primary.opacity(0.4), lineWidth: 1))
+                                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                            .fill(Color.black.opacity(0.62))
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                                    .stroke(
+                                                        LinearGradient(
+                                                            colors: [emotion.primary.opacity(0.65), emotion.secondary.opacity(0.25)],
+                                                            startPoint: .topLeading,
+                                                            endPoint: .bottomTrailing
+                                                        ),
+                                                        lineWidth: 1.2
+                                                    )
+                                            )
+                                            .shadow(color: emotion.primary.opacity(0.22), radius: 14, x: 0, y: 6)
                                     )
                                     .padding(.horizontal, 24)
                                     .transition(.opacity.combined(with: .move(edge: .bottom)))
@@ -281,34 +354,55 @@ struct GismoFaceView: View {
                             // Canlı transkript
                             if !vm.liveTranscript.isEmpty {
                                 Text(vm.liveTranscript)
-                                    .font(.system(size: 12, weight: .medium))
-                                    .foregroundColor(.white.opacity(0.4))
+                                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                                    .foregroundColor(.white.opacity(0.55))
                                     .lineLimit(1)
                                     .truncationMode(.head)
                                     .padding(.horizontal, 28)
                                     .transition(.opacity)
                             }
 
-                            // Durum göstergesi
-                            HStack(spacing: 6) {
+                            // Durum göstergesi (Glass Capsule)
+                            HStack(spacing: 7) {
                                 if vm.isThinking {
-                                    ProgressView().tint(.white.opacity(0.7)).scaleEffect(0.7)
-                                    Text("Düşünüyor...")
-                                        .font(.system(size: 12, weight: .semibold))
-                                        .foregroundColor(.white.opacity(0.5))
+                                    ProgressView().tint(emotion.primary).scaleEffect(0.75)
+                                    Text("DÜŞÜNÜYOR...")
+                                        .font(.system(size: 10, weight: .black, design: .monospaced))
+                                        .tracking(0.8)
+                                        .foregroundColor(.white.opacity(0.7))
+                                } else if vm.isSpeaking {
+                                    Image(systemName: "waveform")
+                                        .font(.system(size: 12, weight: .bold))
+                                        .foregroundColor(emotion.primary)
+                                        .scaleEffect(1.0 + vm.speechLevel * 0.35)
+                                    Text("KONUŞUYOR")
+                                        .font(.system(size: 10, weight: .black, design: .monospaced))
+                                        .tracking(0.8)
+                                        .foregroundColor(emotion.primary)
                                 } else if vm.permissionDenied {
-                                    Image(systemName: "mic.slash").font(.system(size: 12)).foregroundColor(.red.opacity(0.7))
-                                    Text("Mikrofon izni gerekli")
-                                        .font(.system(size: 12, weight: .semibold))
-                                        .foregroundColor(.red.opacity(0.7))
+                                    Image(systemName: "mic.slash").font(.system(size: 11)).foregroundColor(.red.opacity(0.8))
+                                    Text("MİKROFON İZNİ GEREKLİ")
+                                        .font(.system(size: 10, weight: .black, design: .monospaced))
+                                        .foregroundColor(.red.opacity(0.8))
                                 } else {
                                     MicPulseIndicator(isActive: vm.isListening, color: emotion.primary)
-                                    Text(vm.isListening ? "Dinliyor" : "Bağlanıyor...")
-                                        .font(.system(size: 12, weight: .semibold))
-                                        .foregroundColor(.white.opacity(0.45))
+                                    Text(vm.isListening ? "DİNLİYOR" : "HAZIRLANIYOR...")
+                                        .font(.system(size: 10, weight: .black, design: .monospaced))
+                                        .tracking(0.8)
+                                        .foregroundColor(.white.opacity(0.6))
                                 }
                             }
-                            .padding(.bottom, 18)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 6)
+                            .background(
+                                Capsule()
+                                    .fill(Color.black.opacity(0.34))
+                                    .overlay(
+                                        Capsule()
+                                            .stroke(Color.white.opacity(0.10), lineWidth: 1)
+                                    )
+                            )
+                            .padding(.bottom, 16)
                         }
                     }
                     .frame(width: panelW)
@@ -524,54 +618,95 @@ private struct GismoEye: View {
 private struct GismoMouth: View {
     let emotion: GismoEmotion
     let size: CGFloat
+    var isSpeaking: Bool = false
+    var speechLevel: CGFloat = 0.0
 
     var body: some View {
         Group {
-            switch emotion {
-            case .veryHappy:
-                SmileShape(depth: size * 0.12)
-                    .stroke(emotion.primary, style: StrokeStyle(lineWidth: max(9, size * 0.022), lineCap: .round))
-                    .frame(width: size * 0.30, height: size * 0.16)
-            case .happy:
-                SmileShape(depth: size * 0.085)
-                    .stroke(emotion.primary, style: StrokeStyle(lineWidth: max(8, size * 0.019), lineCap: .round))
-                    .frame(width: size * 0.25, height: size * 0.13)
-            case .neutral:
-                Capsule().fill(emotion.primary.opacity(0.72))
-                    .frame(width: size * 0.22, height: max(7, size * 0.016))
-            case .sad:
-                SmileShape(depth: -size * 0.08)
-                    .stroke(emotion.primary, style: StrokeStyle(lineWidth: max(8, size * 0.019), lineCap: .round))
-                    .frame(width: size * 0.24, height: size * 0.12)
-            case .angry:
-                Capsule().fill(emotion.primary)
-                    .frame(width: size * 0.20, height: max(8, size * 0.018))
-                    .rotationEffect(.degrees(-4))
-            case .thoughtful:
-                Capsule().fill(emotion.primary.opacity(0.75))
-                    .frame(width: size * 0.13, height: max(8, size * 0.018))
-                    .offset(x: size * 0.05)
-            case .listening:
-                HStack(spacing: size * 0.018) {
-                    ForEach(0..<3, id: \.self) { index in
-                        Capsule()
-                            .fill(emotion.primary.opacity(0.86))
-                            .frame(width: max(7, size * 0.016), height: size * CGFloat(0.030 + Double(index) * 0.018))
+            if isSpeaking {
+                speakingMouth
+            } else {
+                switch emotion {
+                case .veryHappy:
+                    SmileShape(depth: size * 0.12)
+                        .stroke(emotion.primary, style: StrokeStyle(lineWidth: max(9, size * 0.022), lineCap: .round))
+                        .frame(width: size * 0.30, height: size * 0.16)
+                case .happy:
+                    SmileShape(depth: size * 0.085)
+                        .stroke(emotion.primary, style: StrokeStyle(lineWidth: max(8, size * 0.019), lineCap: .round))
+                        .frame(width: size * 0.25, height: size * 0.13)
+                case .neutral:
+                    Capsule().fill(emotion.primary.opacity(0.72))
+                        .frame(width: size * 0.22, height: max(7, size * 0.016))
+                case .sad:
+                    SmileShape(depth: -size * 0.08)
+                        .stroke(emotion.primary, style: StrokeStyle(lineWidth: max(8, size * 0.019), lineCap: .round))
+                        .frame(width: size * 0.24, height: size * 0.12)
+                case .angry:
+                    Capsule().fill(emotion.primary)
+                        .frame(width: size * 0.20, height: max(8, size * 0.018))
+                        .rotationEffect(.degrees(-4))
+                case .thoughtful:
+                    Capsule().fill(emotion.primary.opacity(0.75))
+                        .frame(width: size * 0.13, height: max(8, size * 0.018))
+                        .offset(x: size * 0.05)
+                case .listening:
+                    HStack(spacing: size * 0.018) {
+                        ForEach(0..<3, id: \.self) { index in
+                            Capsule()
+                                .fill(emotion.primary.opacity(0.86))
+                                .frame(width: max(7, size * 0.016), height: size * CGFloat(0.030 + Double(index) * 0.018))
+                        }
                     }
+                case .surprised:
+                    Circle()
+                        .stroke(emotion.primary, lineWidth: max(8, size * 0.020))
+                        .frame(width: size * 0.12, height: size * 0.12)
+                        .shadow(color: emotion.primary.opacity(0.65), radius: 16, x: 0, y: 0)
+                case .sleeping:
+                    Capsule()
+                        .fill(emotion.primary.opacity(0.5))
+                        .frame(width: size * 0.10, height: max(6, size * 0.013))
+                        .offset(y: size * 0.01)
                 }
-            case .surprised:
-                Circle()
-                    .stroke(emotion.primary, lineWidth: max(8, size * 0.020))
-                    .frame(width: size * 0.12, height: size * 0.12)
-                    .shadow(color: emotion.primary.opacity(0.65), radius: 16, x: 0, y: 0)
-            case .sleeping:
-                Capsule()
-                    .fill(emotion.primary.opacity(0.5))
-                    .frame(width: size * 0.10, height: max(6, size * 0.013))
-                    .offset(y: size * 0.01)
             }
         }
         .shadow(color: emotion.primary.opacity(0.55), radius: 12, x: 0, y: 0)
+    }
+
+    private var speakingMouth: some View {
+        let clamped = max(0.05, min(1.0, speechLevel))
+        let mouthWidth = size * (0.18 + (1.0 - clamped * 0.25) * 0.08)
+        let mouthHeight = max(size * 0.022, size * (0.024 + clamped * 0.135))
+        let cornerRadius = min(mouthWidth, mouthHeight) * 0.48
+
+        return ZStack(alignment: .bottom) {
+            // İç ağız dolgusu
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .fill(emotion.primary.opacity(0.22 + Double(clamped) * 0.25))
+                .frame(width: mouthWidth, height: mouthHeight)
+
+            // Sevimli alt dil/parıltı detayı (ağız açıldığında belirir)
+            if clamped > 0.25 {
+                Capsule()
+                    .fill(emotion.secondary.opacity(0.65))
+                    .frame(width: mouthWidth * 0.55, height: mouthHeight * 0.36)
+                    .padding(.bottom, max(2, mouthHeight * 0.08))
+            }
+
+            // Parlak dış ağız çizgisi
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .stroke(
+                    LinearGradient(
+                        colors: [emotion.primary, emotion.secondary],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: max(6, size * 0.016)
+                )
+                .frame(width: mouthWidth, height: mouthHeight)
+        }
+        .animation(.interactiveSpring(response: 0.08, dampingFraction: 0.72), value: speechLevel)
     }
 }
 
@@ -1102,238 +1237,321 @@ struct IntegrationsView: View {
     @AppStorage("isSmsActive") private var isSmsActive: Bool = false
     @State private var showSMSInfo = false
     @State private var showSMSLogin = false
+
+    @AppStorage("customGeminiApiKey") private var customGeminiApiKey: String = ""
+    @State private var showGeminiKeyPrompt = false
+    @State private var geminiKeyInput = ""
     
     var body: some View {
         NavigationView {
             ZStack {
-                // Premium Gradient Background
-                LinearGradient(
-                    gradient: Gradient(colors: [Color(red: 0.05, green: 0.05, blue: 0.08), Color(red: 0.1, green: 0.1, blue: 0.15)]),
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                ).ignoresSafeArea()
+                GismoBackground()
                 
-                VStack(spacing: 32) {
-                    
-                    // Başlık Bilgisi
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Dijital Asistan")
-                            .font(.system(size: 28, weight: .black, design: .rounded))
-                            .foregroundColor(.white)
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 22) {
                         
-                        Text("Gismo'yu yetkilendirerek senin adına e-posta atmasını, fotoğraf göndermesini ve Google Drive'ına erişmesini sağlayabilirsin.")
-                            .font(.system(size: 15, weight: .regular, design: .rounded))
-                            .foregroundColor(.white.opacity(0.7))
-                            .lineSpacing(4)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 24)
-                    .padding(.top, 20)
-                    
-                    // Google Card
-                    VStack(alignment: .leading, spacing: 20) {
-                        HStack(spacing: 16) {
-                            // Modern Icon
-                            ZStack {
-                                Circle()
-                                    .fill(Color.white)
-                                    .frame(width: 56, height: 56)
-                                    .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
-                                
-                                Image("GoogleIcon")
-                                    .resizable()
-                                    .scaledToFit()
-                                    .frame(width: 32, height: 32)
+                        // Başlık Bilgisi
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "sparkles")
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundColor(.gCyan)
+                                Text("BULUT & YAPAY ZEKA MERKEZİ")
+                                    .font(.system(size: 10, weight: .black, design: .monospaced))
+                                    .foregroundColor(.gCyan)
+                                    .tracking(1.4)
                             }
+
+                            Text("Dijital Asistan")
+                                .font(.system(size: 28, weight: .black, design: .rounded))
+                                .foregroundColor(.white)
                             
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text("Google Servisleri")
-                                    .font(.system(size: 18, weight: .bold, design: .rounded))
-                                    .foregroundColor(.white)
+                            Text("Gismo'yu yetkilendirerek senin adına e-posta yönetmesini, fotoğraf çekip göndermesini, Google Drive ve Google Fotoğraflar'ına tam erişmesini sağlayabilirsin.")
+                                .font(.system(size: 14, weight: .medium, design: .rounded))
+                                .foregroundColor(.gSubtext)
+                                .lineSpacing(4)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 22)
+                        .padding(.top, 12)
+                        
+                        // Google Servisleri Card
+                        VStack(alignment: .leading, spacing: 18) {
+                            HStack(spacing: 15) {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                        .fill(Color.white)
+                                        .frame(width: 54, height: 54)
+                                        .shadow(color: .black.opacity(0.25), radius: 8, x: 0, y: 4)
+                                    
+                                    Image("GoogleIcon")
+                                        .resizable()
+                                        .scaledToFit()
+                                        .frame(width: 30, height: 30)
+                                }
                                 
-                                if authService.isConnected, let email = authService.currentUser?.profile?.email {
-                                    HStack(spacing: 6) {
-                                        Circle()
-                                            .fill(Color.green)
-                                            .frame(width: 8, height: 8)
-                                            .shadow(color: .green.opacity(0.8), radius: 4)
-                                        Text(email)
-                                            .font(.system(size: 14, weight: .semibold, design: .rounded))
-                                            .foregroundColor(.green.opacity(0.9))
-                                            .lineLimit(1)
+                                VStack(alignment: .leading, spacing: 5) {
+                                    Text("Google Workspace & Photos")
+                                        .font(.system(size: 18, weight: .black, design: .rounded))
+                                        .foregroundColor(.white)
+                                    
+                                    if authService.isConnected, let email = authService.currentUser?.profile?.email {
+                                        HStack(spacing: 6) {
+                                            Circle()
+                                                .fill(Color.gSuccess)
+                                                .frame(width: 7, height: 7)
+                                                .shadow(color: Color.gSuccess, radius: 4)
+                                            Text(email)
+                                                .font(.system(size: 13, weight: .bold, design: .rounded))
+                                                .foregroundColor(.gSuccess)
+                                                .lineLimit(1)
+                                        }
+                                    } else {
+                                        Text("Hesap bağlı değil")
+                                            .font(.system(size: 13, weight: .medium, design: .rounded))
+                                            .foregroundColor(.gSubtext)
+                                        if let err = authService.lastAuthError {
+                                            Text(err)
+                                                .font(.system(size: 11, weight: .medium))
+                                                .foregroundColor(.gDanger)
+                                                .lineLimit(2)
+                                        }
                                     }
-                                } else {
-                                    Text("Bağlantı Bekleniyor")
-                                        .font(.system(size: 14, weight: .medium, design: .rounded))
-                                        .foregroundColor(.white.opacity(0.4))
                                 }
+                                Spacer(minLength: 0)
                             }
-                            Spacer(minLength: 0)
-                        }
-                        
-                        HStack(spacing: 12) {
-                            Spacer()
+
+                            // Capability badges
+                            HStack(spacing: 8) {
+                                serviceCapabilityBadge(icon: "externaldrive.fill", label: "Drive")
+                                serviceCapabilityBadge(icon: "photo.on.rectangle.angled", label: "Photos")
+                                serviceCapabilityBadge(icon: "envelope.fill", label: "Gmail")
+                            }
                             
-                            Button {
-                                showGoogleInfo = true
-                            } label: {
-                                Text("Detaylar")
-                                    .font(.system(size: 14, weight: .bold, design: .rounded))
-                                    .padding(.horizontal, 16)
+                            HStack(spacing: 10) {
+                                Button {
+                                    showGoogleInfo = true
+                                } label: {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "info.circle")
+                                            .font(.system(size: 13, weight: .bold))
+                                        Text("Komutlar & Detaylar")
+                                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                                    }
+                                    .padding(.horizontal, 14)
                                     .padding(.vertical, 10)
-                                    .background(Color.white.opacity(0.05))
-                                    .foregroundColor(.white.opacity(0.8))
-                                    .cornerRadius(20)
-                            }
-                            
-                            if authService.isConnected {
-                                Button {
-                                    withAnimation { authService.signOut() }
-                                } label: {
-                                    Text("Kaldır")
-                                        .font(.system(size: 14, weight: .bold, design: .rounded))
-                                        .padding(.horizontal, 20)
-                                        .padding(.vertical, 10)
-                                        .background(Color.white.opacity(0.1))
-                                        .foregroundColor(.white)
-                                        .cornerRadius(20)
+                                    .background(
+                                        Capsule()
+                                            .fill(Color.white.opacity(0.06))
+                                            .overlay(Capsule().stroke(Color.white.opacity(0.10), lineWidth: 1))
+                                    )
+                                    .foregroundColor(.white.opacity(0.85))
                                 }
-                            } else {
-                                Button {
-                                    signIn()
-                                } label: {
-                                    Text("Bağla")
-                                        .font(.system(size: 14, weight: .bold, design: .rounded))
-                                        .padding(.horizontal, 24)
+                                .buttonStyle(ScaleButtonStyle())
+
+                                Spacer()
+                                
+                                if authService.isConnected {
+                                    Button {
+                                        withAnimation { authService.signOut() }
+                                    } label: {
+                                        Text("Bağlantıyı Kes")
+                                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                                            .padding(.horizontal, 16)
+                                            .padding(.vertical, 10)
+                                            .background(Capsule().fill(Color.gDanger.opacity(0.16)))
+                                            .overlay(Capsule().stroke(Color.gDanger.opacity(0.35), lineWidth: 1))
+                                            .foregroundColor(.gDanger)
+                                    }
+                                    .buttonStyle(ScaleButtonStyle())
+                                } else {
+                                    Button {
+                                        signIn()
+                                    } label: {
+                                        HStack(spacing: 6) {
+                                            Image(systemName: "link.badge.plus")
+                                                .font(.system(size: 13, weight: .bold))
+                                            Text("Hesabı Bağla")
+                                                .font(.system(size: 13, weight: .bold, design: .rounded))
+                                        }
+                                        .padding(.horizontal, 18)
                                         .padding(.vertical, 10)
-                                        .background(Color.blue)
+                                        .background(Capsule().fill(LinearGradient.accent))
                                         .foregroundColor(.white)
-                                        .cornerRadius(20)
-                                        .shadow(color: .blue.opacity(0.3), radius: 5, x: 0, y: 3)
+                                        .shadow(color: Color.gAccent.opacity(0.35), radius: 8, x: 0, y: 4)
+                                    }
+                                    .buttonStyle(ScaleButtonStyle())
                                 }
                             }
                         }
-                    }
-                    .padding(20)
-                    .background(
-                        RoundedRectangle(cornerRadius: 24)
-                            .fill(authService.isConnected ? Color.green.opacity(0.04) : Color.white.opacity(0.04))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 24)
-                                    .stroke(authService.isConnected ? Color.green.opacity(0.4) : Color.white.opacity(0.08), lineWidth: 1)
-                            )
-                    )
-                    .shadow(color: authService.isConnected ? Color.green.opacity(0.1) : .clear, radius: 15, x: 0, y: 8)
-                    .padding(.horizontal, 24)
-                    
-                    // SMS Card
-                    VStack(alignment: .leading, spacing: 20) {
-                        HStack(spacing: 16) {
-                            // SMS Icon
-                            ZStack {
-                                Circle()
-                                    .fill(Color.white)
-                                    .frame(width: 56, height: 56)
-                                    .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
+                        .glassCard(padding: 18, cornerRadius: 24)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                                .stroke(authService.isConnected ? Color.gSuccess.opacity(0.45) : Color.clear, lineWidth: 1.2)
+                        )
+                        .padding(.horizontal, 20)
+                        
+                        // SMS Card
+                        VStack(alignment: .leading, spacing: 18) {
+                            HStack(spacing: 15) {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                        .fill(Color.white)
+                                        .frame(width: 54, height: 54)
+                                        .shadow(color: .black.opacity(0.25), radius: 8, x: 0, y: 4)
+                                    
+                                    Image("NetgsmIcon")
+                                        .resizable()
+                                        .scaledToFill()
+                                        .frame(width: 36, height: 36)
+                                        .clipShape(Circle())
+                                }
                                 
-                                Image("NetgsmIcon")
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(width: 36, height: 36)
-                                    .clipShape(Circle())
+                                VStack(alignment: .leading, spacing: 5) {
+                                    Text("SMS & Rehber Servisi")
+                                        .font(.system(size: 18, weight: .black, design: .rounded))
+                                        .foregroundColor(.white)
+                                    
+                                    if isSmsActive {
+                                        HStack(spacing: 6) {
+                                            Circle()
+                                                .fill(Color.gSuccess)
+                                                .frame(width: 7, height: 7)
+                                                .shadow(color: Color.gSuccess, radius: 4)
+                                            Text("Netgsm Altyapısı Aktif")
+                                                .font(.system(size: 13, weight: .bold, design: .rounded))
+                                                .foregroundColor(.gSuccess)
+                                                .lineLimit(1)
+                                        }
+                                    } else {
+                                        Text("Netgsm ile sesli SMS gönderimi")
+                                            .font(.system(size: 13, weight: .medium, design: .rounded))
+                                            .foregroundColor(.gSubtext)
+                                    }
+                                }
+                                Spacer(minLength: 0)
                             }
                             
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text("SMS Gönderimi")
-                                    .font(.system(size: 18, weight: .bold, design: .rounded))
-                                    .foregroundColor(.white)
+                            HStack(spacing: 10) {
+                                Button {
+                                    showSMSInfo = true
+                                } label: {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "info.circle")
+                                            .font(.system(size: 13, weight: .bold))
+                                        Text("Detaylar")
+                                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                                    }
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 10)
+                                    .background(
+                                        Capsule()
+                                            .fill(Color.white.opacity(0.06))
+                                            .overlay(Capsule().stroke(Color.white.opacity(0.10), lineWidth: 1))
+                                    )
+                                    .foregroundColor(.white.opacity(0.85))
+                                }
+                                .buttonStyle(ScaleButtonStyle())
+
+                                Spacer()
                                 
                                 if isSmsActive {
-                                    HStack(spacing: 6) {
-                                        Circle()
-                                            .fill(Color.green)
-                                            .frame(width: 8, height: 8)
-                                            .shadow(color: .green.opacity(0.8), radius: 4)
-                                        Text("Netgsm Altyapısı Aktif")
-                                            .font(.system(size: 14, weight: .semibold, design: .rounded))
-                                            .foregroundColor(.green.opacity(0.9))
-                                            .lineLimit(1)
+                                    Button {
+                                        withAnimation { isSmsActive = false }
+                                    } label: {
+                                        Text("Devre Dışı Bırak")
+                                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                                            .padding(.horizontal, 16)
+                                            .padding(.vertical, 10)
+                                            .background(Capsule().fill(Color.white.opacity(0.10)))
+                                            .foregroundColor(.white)
                                     }
+                                    .buttonStyle(ScaleButtonStyle())
                                 } else {
-                                    Text("Pasif Durumda")
-                                        .font(.system(size: 14, weight: .medium, design: .rounded))
-                                        .foregroundColor(.white.opacity(0.4))
-                                }
-                            }
-                            Spacer(minLength: 0)
-                        }
-                        
-                        HStack(spacing: 12) {
-                            Spacer()
-                            
-                            Button {
-                                showSMSInfo = true
-                            } label: {
-                                Text("Detaylar")
-                                    .font(.system(size: 14, weight: .bold, design: .rounded))
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 10)
-                                    .background(Color.white.opacity(0.05))
-                                    .foregroundColor(.white.opacity(0.8))
-                                    .cornerRadius(20)
-                            }
-                            
-                            if isSmsActive {
-                                Button {
-                                    withAnimation { isSmsActive = false }
-                                } label: {
-                                    Text("Kapat")
-                                        .font(.system(size: 14, weight: .bold, design: .rounded))
-                                        .padding(.horizontal, 20)
-                                        .padding(.vertical, 10)
-                                        .background(Color.white.opacity(0.1))
-                                        .foregroundColor(.white)
-                                        .cornerRadius(20)
-                                }
-                            } else {
-                                Button {
-                                    showSMSLogin = true
-                                } label: {
-                                    Text("Aç")
-                                        .font(.system(size: 14, weight: .bold, design: .rounded))
-                                        .padding(.horizontal, 24)
-                                        .padding(.vertical, 10)
-                                        .background(Color.orange)
-                                        .foregroundColor(.white)
-                                        .cornerRadius(20)
-                                        .shadow(color: .orange.opacity(0.3), radius: 5, x: 0, y: 3)
+                                    Button {
+                                        showSMSLogin = true
+                                    } label: {
+                                        Text("Yapılandır & Aç")
+                                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                                            .padding(.horizontal, 18)
+                                            .padding(.vertical, 10)
+                                            .background(Capsule().fill(Color.gWarning))
+                                            .foregroundColor(.black)
+                                            .shadow(color: Color.gWarning.opacity(0.3), radius: 8, x: 0, y: 4)
+                                    }
+                                    .buttonStyle(ScaleButtonStyle())
                                 }
                             }
                         }
+                        .glassCard(padding: 18, cornerRadius: 24)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                                .stroke(isSmsActive ? Color.gSuccess.opacity(0.45) : Color.clear, lineWidth: 1.2)
+                        )
+                        .padding(.horizontal, 20)
+
+                        // Gemini API Anahtarı & Ses Motoru Card
+                        Button {
+                            geminiKeyInput = customGeminiApiKey
+                            showGeminiKeyPrompt = true
+                        } label: {
+                            HStack(spacing: 14) {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                        .fill(Color.gAccent.opacity(0.18))
+                                        .frame(width: 46, height: 46)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                                .stroke(Color.gAccent.opacity(0.4), lineWidth: 1)
+                                        )
+                                    Image(systemName: "waveform.badge.magnifyingglass")
+                                        .font(.system(size: 18, weight: .bold))
+                                        .foregroundColor(.gAccent2)
+                                }
+
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(customGeminiApiKey.isEmpty ? "Gemini Live AI Anahtarı" : "Özel Gemini Anahtarı Aktif")
+                                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                                        .foregroundColor(.white)
+                                    Text("24kHz Native Audio • Özel API anahtarı girmek için dokun")
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundColor(.gSubtext)
+                                }
+
+                                Spacer()
+
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 13, weight: .bold))
+                                    .foregroundColor(.gAccent2)
+                            }
+                            .glassCard(padding: 16, cornerRadius: 20)
+                        }
+                        .buttonStyle(ScaleButtonStyle())
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 30)
                     }
-                    .padding(20)
-                    .background(
-                        RoundedRectangle(cornerRadius: 24)
-                            .fill(isSmsActive ? Color.green.opacity(0.04) : Color.white.opacity(0.04))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 24)
-                                    .stroke(isSmsActive ? Color.green.opacity(0.4) : Color.white.opacity(0.08), lineWidth: 1)
-                            )
-                    )
-                    .shadow(color: isSmsActive ? Color.green.opacity(0.1) : .clear, radius: 15, x: 0, y: 8)
-                    .padding(.horizontal, 24)
-                    
-                    Spacer()
                 }
             }
             .navigationTitle("Entegrasyonlar")
             .navigationBarTitleDisplayMode(.inline)
+            .alert("Gemini API Anahtarı", isPresented: $showGeminiKeyPrompt) {
+                TextField("AIzaSy...", text: $geminiKeyInput)
+                Button("Varsayılana Dön", role: .destructive) {
+                    customGeminiApiKey = ""
+                }
+                Button("İptal", role: .cancel) {}
+                Button("Kaydet") {
+                    customGeminiApiKey = geminiKeyInput.trimmingCharacters(in: .whitespacesAndNewlines)
+                }
+            } message: {
+                Text("Google AI Studio (aistudio.google.com) üzerinden aldığınız Gemini API anahtarını girin.")
+            }
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button { dismiss() } label: {
                         Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.white.opacity(0.5))
+                            .foregroundColor(.white.opacity(0.6))
                             .font(.system(size: 24))
                     }
                 }
@@ -1347,17 +1565,38 @@ struct IntegrationsView: View {
             .sheet(isPresented: $showSMSLogin) {
                 SMSLoginView()
             }
-            // URL scheme yakalama (Eğer custom URL kullanılıyorsa)
             .onOpenURL { url in
                 GIDSignIn.sharedInstance.handle(url)
             }
         }
         .preferredColorScheme(.dark)
     }
+
+    private func serviceCapabilityBadge(icon: String, label: String) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: icon)
+                .font(.system(size: 10, weight: .bold))
+                .foregroundColor(.gAccent2)
+            Text(label)
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .foregroundColor(.white.opacity(0.85))
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(
+            Capsule()
+                .fill(Color.black.opacity(0.28))
+                .overlay(Capsule().stroke(Color.white.opacity(0.08), lineWidth: 1))
+        )
+    }
     
     private func signIn() {
-        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-              let rootVC = windowScene.windows.first?.rootViewController else { return }
+        guard let windowScene = UIApplication.shared.connectedScenes
+            .compactMap({ $0 as? UIWindowScene })
+            .first(where: { $0.activationState == .foregroundActive })
+            ?? UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first,
+              let rootVC = windowScene.windows.first(where: { $0.isKeyWindow })?.rootViewController
+            ?? windowScene.windows.first?.rootViewController else { return }
         
         authService.signIn(presenting: rootVC)
     }
@@ -1421,10 +1660,10 @@ struct GoogleInfoView: View {
                         .padding(.bottom, 10)
                     
                     VStack(alignment: .leading, spacing: 16) {
-                        InfoRow(icon: "envelope.fill", color: .blue, title: "E-Posta Yönetimi", desc: "Belirttiğin adreslere e-posta gönderebilir veya gelen kutundaki son mailleri okuyup özetleyebilir.")
-                        InfoRow(icon: "camera.fill", color: .purple, title: "Fotoğraf & Mail", desc: "Seni görüp fotoğrafını çekebilir ve anında dilediğin kişiye mail olarak eklentiyle yollayabilir.")
-                        InfoRow(icon: "externaldrive.fill", color: .green, title: "Google Drive Dosya Yükleme", desc: "Çektiği fotoğrafları güvenle doğrudan kendi Google Drive'ına kaydedebilir.")
-                        InfoRow(icon: "doc.text.magnifyingglass", color: .orange, title: "Drive'da Arama ve Okuma", desc: "Google Drive'ındaki metin veya doküman dosyalarını isminden bulup içeriğini saniyeler içinde okuyup özetleyebilir.")
+                        InfoRow(icon: "envelope.fill", color: .blue, title: "Gmail E-Posta Yönetimi", desc: "Gelen kutusundaki maillerin tam içeriğini okuyup özetleyebilir, kişi/konu bazlı mail arayabilir ve dosya ekli e-postalar gönderebilir.")
+                        InfoRow(icon: "photo.on.rectangle.angled", color: .purple, title: "Google Fotoğraflar (Photos)", desc: "Çektiği fotoğrafları doğrudan Google Fotoğraflar albümüne yükleyebilir, fotoğrafları arayabilir ve buluttan telefon galerisine indirebilir.")
+                        InfoRow(icon: "externaldrive.fill", color: .green, title: "Google Drive Dosya Yükleme & Oluşturma", desc: "Fotoğrafları, toplantı notlarını ve özet metinleri yeni dosya olarak doğrudan Google Drive'ına kaydedebilir.")
+                        InfoRow(icon: "doc.text.magnifyingglass", color: .orange, title: "Drive Arama, Açma, Özetleme & İndirme", desc: "Google Docs, E-Tablo, Sunu, PDF ve metin dosyalarını isminden bulup içeriğini okuyabilir, özetleyebilir ve e-posta ile gönderebilir.")
                     }
                     
                     Divider().background(Color.white.opacity(0.2)).padding(.vertical, 8)

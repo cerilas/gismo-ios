@@ -1,4 +1,5 @@
 import SwiftUI
+import GoogleSignIn
 
 @main
 struct GismoApp: App {
@@ -20,9 +21,13 @@ struct GismoApp: App {
             }
             .animation(.easeInOut(duration: 0.6), value: showSplash)
             .onAppear {
+                GoogleAuthService.shared.checkStatus()
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2.6) {
                     showSplash = false
                 }
+            }
+            .onOpenURL { url in
+                GIDSignIn.sharedInstance.handle(url)
             }
             .preferredColorScheme(.dark)
         }

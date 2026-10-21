@@ -17,7 +17,8 @@ final class GismoVoiceEngine: ObservableObject {
     private var silenceTimer: Task<Void, Never>?
     private var restartTask: Task<Void, Never>?
     private var isAudioEngineRunning = false
-    private let silenceSeconds: Double = 1.5
+    private var isPausedForSpeech = false
+    private let silenceSeconds: Double = 0.95
 
     // MARK: - Permissions
 
@@ -34,10 +35,11 @@ final class GismoVoiceEngine: ObservableObject {
     // MARK: - Public
 
     func start() {
+        isPausedForSpeech = false
         guard !isListening else { return }
         do {
             let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playAndRecord, mode: .measurement,
+            try session.setCategory(.playAndRecord, mode: .default,
                                     options: [.duckOthers, .defaultToSpeaker])
             try session.setActive(true, options: .notifyOthersOnDeactivation)
         } catch {
@@ -48,7 +50,22 @@ final class GismoVoiceEngine: ObservableObject {
         startAudioEngineAndRecognition()
     }
 
+    /// Gismo konuşurken kendi sesini dinleyip döngüye girmemesi için mikrofon tanımayı geçici duraklatır
+    func pauseForSpeech() {
+        isPausedForSpeech = true
+        liveTranscript = ""
+        teardownAll()
+    }
+
+    /// Gismo konuşmayı bitirdiğinde tekrar dinlemeye başlar
+    func resumeAfterSpeech() {
+        guard isPausedForSpeech else { return }
+        isPausedForSpeech = false
+        startAudioEngineAndRecognition()
+    }
+
     func stop() {
+        isPausedForSpeech = false
         restartTask?.cancel()
         restartTask = nil
         teardownAll()
@@ -59,6 +76,7 @@ final class GismoVoiceEngine: ObservableObject {
     // MARK: - Recognition Core
 
     private func startAudioEngineAndRecognition() {
+        guard !isPausedForSpeech else { return }
         teardownAll()
 
         guard let recognizer = speechRecognizer, recognizer.isAvailable else {
@@ -124,11 +142,11 @@ final class GismoVoiceEngine: ObservableObject {
             }
             
             if error != nil || result?.isFinal == true {
-                guard self.isListening else { return }
+                guard self.isListening, !self.isPausedForSpeech else { return }
                 
                 Task { @MainActor in
                     try? await Task.sleep(for: .milliseconds(200))
-                    if self.isListening {
+                    if self.isListening && !self.isPausedForSpeech && self.currentTaskID == taskID {
                         self.startAudioEngineAndRecognition()
                     }
                 }
@@ -140,7 +158,7 @@ final class GismoVoiceEngine: ObservableObject {
         restartTask?.cancel()
         restartTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(50))
-            guard let self, !Task.isCancelled, self.isListening else { return }
+            guard let self, !Task.isCancelled, self.isListening, !self.isPausedForSpeech else { return }
             self.startAudioEngineAndRecognition()
         }
     }
@@ -170,16 +188,15 @@ final class GismoVoiceEngine: ObservableObject {
         silenceTimer?.cancel()
         silenceTimer = Task {
             try? await Task.sleep(for: .seconds(self.silenceSeconds))
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled, !self.isPausedForSpeech else { return }
             let text = self.liveTranscript.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !text.isEmpty else { return }
             
             self.liveTranscript = ""
             print("[Voice] Utterance: \(text)")
+            // Konuşma algılandığı anda mikrofonu hemen duraklat (efekt sesini veya kendi sesini dinleyip döngüye girmesin)
+            self.pauseForSpeech()
             self.onUtteranceReady?(text)
-            
-            // Konuşma algılandıktan sonra tam bir şekilde yenile
-            self.startAudioEngineAndRecognition()
         }
     }
 }
