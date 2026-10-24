@@ -20,6 +20,7 @@
 		6D82929E081CAD69C2AE34BD /* ESPService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F4666CDDFB137F6067FA30C /* ESPService.swift */; };
 		6EFD514CAB0B5E341EAF304F /* GismoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E6D113F39FA6E5B2E5BB70A /* GismoApp.swift */; };
 		738BA7DBBC34BC504B9F5BD7 /* GismoFaceViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6389410929375F84F7529966 /* GismoFaceViewModel.swift */; };
+		A1C0FFEE0000000000000003 /* FaceTrackingController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0FFEE0000000000000004 /* FaceTrackingController.swift */; };
 		7661EF2C1A172A5C266EFF4F /* GeminiService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 292A1291A9152C8613562BEF /* GeminiService.swift */; };
 		8E624FF1ECDE5630CF96CBF7 /* GoogleDriveService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56A27BF6EFD3A311403B7BCF /* GoogleDriveService.swift */; };
 		9891F289347AEEAE25481580 /* DatabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C430B39F51B6C1F67CCBE335 /* DatabaseService.swift */; };
@@ -31,6 +32,7 @@
 		C02B32055AEC5AACD1F6BFEE /* Robot.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA201353E257FB269F4C1700 /* Robot.swift */; };
 		C44CA75E034B3399EE805710 /* ControlView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E48887149EC5FC2D7350A75 /* ControlView.swift */; };
 		C86F3889F135E3C75F9017BE /* GismoSoundEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C5731916A2F63AB0610B699 /* GismoSoundEngine.swift */; };
+		A1C0FFEE0000000000000001 /* CuteRobotVoiceDSP.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0FFEE0000000000000002 /* CuteRobotVoiceDSP.swift */; };
 		D0A2F8C3AF796F83F4C5DD95 /* SplashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4D2423611CA26FDB1175486 /* SplashView.swift */; };
 		E6F9C998B3F6AA265C478CE4 /* GismoFaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DE70479E34D67720820F8AB /* GismoFaceView.swift */; };
 		E957EF1DFE1ED02C386C7245 /* RobotListViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 802A82449946EE717D78AEC4 /* RobotListViewModel.swift */; };
@@ -49,6 +51,7 @@
 		277243752388FCB4C4351036 /* Step2WiFiScanView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Step2WiFiScanView.swift; sourceTree = "<group>"; };
 		292A1291A9152C8613562BEF /* GeminiService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiService.swift; sourceTree = "<group>"; };
 		2C5731916A2F63AB0610B699 /* GismoSoundEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GismoSoundEngine.swift; sourceTree = "<group>"; };
+		A1C0FFEE0000000000000002 /* CuteRobotVoiceDSP.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CuteRobotVoiceDSP.swift; sourceTree = "<group>"; };
 		30F51A6808D3B956CCFDAA07 /* JoystickView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JoystickView.swift; sourceTree = "<group>"; };
 		37705E1A13F14F05F5FCB4EA /* SetupContainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupContainerView.swift; sourceTree = "<group>"; };
 		40A4F29F0FB82BC34AD65BC3 /* ControlViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlViewModel.swift; sourceTree = "<group>"; };
@@ -57,6 +60,7 @@
 		56A27BF6EFD3A311403B7BCF /* GoogleDriveService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleDriveService.swift; sourceTree = "<group>"; };
 		599A26DAF6D535830EA400D8 /* Config.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Config.swift; sourceTree = "<group>"; };
 		6389410929375F84F7529966 /* GismoFaceViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GismoFaceViewModel.swift; sourceTree = "<group>"; };
+		A1C0FFEE0000000000000004 /* FaceTrackingController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FaceTrackingController.swift; sourceTree = "<group>"; };
 		7226910B37B830114DDBEC93 /* OrientationController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrientationController.swift; sourceTree = "<group>"; };
 		7E48887149EC5FC2D7350A75 /* ControlView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlView.swift; sourceTree = "<group>"; };
 		802A82449946EE717D78AEC4 /* RobotListViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RobotListViewModel.swift; sourceTree = "<group>"; };
@@ -124,6 +128,7 @@
 				292A1291A9152C8613562BEF /* GeminiService.swift */,
 				9D506989F006F0E05585D0A2 /* GismoCameraService.swift */,
 				2C5731916A2F63AB0610B699 /* GismoSoundEngine.swift */,
+				A1C0FFEE0000000000000002 /* CuteRobotVoiceDSP.swift */,
 				AD50252591D1738C9504E4DE /* GismoVoiceEngine.swift */,
 				56A27BF6EFD3A311403B7BCF /* GoogleDriveService.swift */,
 				55049015532F61A7D2C0FBD4 /* WebSocketService.swift */,
@@ -187,6 +192,7 @@
 			children = (
 				40A4F29F0FB82BC34AD65BC3 /* ControlViewModel.swift */,
 				6389410929375F84F7529966 /* GismoFaceViewModel.swift */,
+				A1C0FFEE0000000000000004 /* FaceTrackingController.swift */,
 				802A82449946EE717D78AEC4 /* RobotListViewModel.swift */,
 				88713715C5C1BDED41CCF3C0 /* SetupViewModel.swift */,
 			);
@@ -314,7 +320,9 @@
 				0E816D4FDA9E3BA3B533A111 /* GismoCameraService.swift in Sources */,
 				E6F9C998B3F6AA265C478CE4 /* GismoFaceView.swift in Sources */,
 				738BA7DBBC34BC504B9F5BD7 /* GismoFaceViewModel.swift in Sources */,
+				A1C0FFEE0000000000000003 /* FaceTrackingController.swift in Sources */,
 				C86F3889F135E3C75F9017BE /* GismoSoundEngine.swift in Sources */,
+				A1C0FFEE0000000000000001 /* CuteRobotVoiceDSP.swift in Sources */,
 				3EE21997B84B21F01931E9FC /* GismoVoiceEngine.swift in Sources */,
 				8E624FF1ECDE5630CF96CBF7 /* GoogleDriveService.swift in Sources */,
 				4910EDAB839FE598FFA123E9 /* JoystickView.swift in Sources */,

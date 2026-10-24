@@ -55,6 +55,46 @@ final class WebSocketService {
         ], expecting: "command_ack")
     }
 
+    // MARK: - Gerçek Zamanlı Motor Komutu (Yüz Takibi)
+
+    /// Ölçülen uygulama → sunucu → uygulama komut gidiş-dönüş süresi (saniye, EWMA).
+    /// Sunucu komutu robota ilettikten sonra ack döndüğü için robot gecikmesinin iyi bir tahminidir.
+    private(set) var commandRoundTrip: TimeInterval = 0.18
+    private var realtimeSentAt: [String: TimeInterval] = [:]
+
+    /// Ack BEKLEMEDEN, çağrıldığı anda soket'e yazar. Aynı aktörden ardışık çağrılar
+    /// soket'e aynı sırayla yazılır → "L" ardından "S" asla yer değiştirmez.
+    /// Yüz takibi gibi milisaniye hassasiyetli darbeler için kullanılır.
+    func sendRealtimeCommand(_ command: RobotCommand, to robotID: UUID) {
+        connect()
+        guard let task else { return }
+
+        let requestID = "rt-" + UUID().uuidString
+        let payload: [String: Any] = [
+            "type": "command",
+            "robot_id": robotID.uuidString,
+            "command": command.rawValue,
+            "request_id": requestID
+        ]
+        guard let data = try? JSONSerialization.data(withJSONObject: payload) else { return }
+
+        realtimeSentAt[requestID] = ProcessInfo.processInfo.systemUptime
+        if realtimeSentAt.count > 64 { realtimeSentAt.removeAll() } // ack'i hiç gelmeyenleri temizle
+
+        task.send(.string(String(decoding: data, as: UTF8.self))) { error in
+            if let error {
+                print("[WS] Gerçek zamanlı komut gönderilemedi: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    private func recordRealtimeAck(_ requestID: String) {
+        guard let sentAt = realtimeSentAt.removeValue(forKey: requestID) else { return }
+        let rtt = ProcessInfo.processInfo.systemUptime - sentAt
+        guard rtt > 0, rtt < 3 else { return }
+        commandRoundTrip = commandRoundTrip * 0.8 + rtt * 0.2
+    }
+
     func registerRobot(_ robot: Robot) async throws {
         let data = try await request([
             "type": "register_robot",
@@ -151,6 +191,13 @@ final class WebSocketService {
             let object = try JSONSerialization.jsonObject(with: data) as? [String: Any],
             let type = object["type"] as? String
         else {
+            return
+        }
+
+        if let requestID = object["request_id"] as? String, requestID.hasPrefix("rt-") {
+            // Gerçek zamanlı komut yanıtı: kimse beklemiyor, sadece gecikmeyi ölç
+            if type == "command_ack" { recordRealtimeAck(requestID) }
+            else { realtimeSentAt.removeValue(forKey: requestID) }
             return
         }
 

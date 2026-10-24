@@ -19,7 +19,7 @@ final class GismoFaceViewModel: ObservableObject {
     @Published var speechLevel: CGFloat = 0.0
     @Published var showResponse: Bool = false
     @Published var permissionDenied: Bool = false
-    @Published var isTrackingEnabled: Bool = false // Fiziksel motor yüz takibi dengesizlik nedeniyle devre dışı bırakıldı
+    @Published var isTrackingEnabled: Bool = false // Kullanıcı "TAKİP" butonuyla açar (FaceTrackingCore ile stabil darbe kontrolü)
     private var didCapturePhotoInCurrentTurn: Bool = false
 
     private let voiceEngine = GismoVoiceEngine()
@@ -37,22 +37,14 @@ final class GismoFaceViewModel: ObservableObject {
     @Published var currentTrackingCommand: RobotCommand = .stop
     private let idleTimeout: Double = 60  // saniye
 
-    // MARK: - Pulse & Settle Takip State Machine
-    private enum TrackingState {
-        case idle
-        case moving(until: Date)
-        case settling(until: Date)
-    }
-    private var trackingState: TrackingState = .idle
-    /// Sabit çok kısa burst: robot tek bir kışı adım atar (0.04 sn)
-    private let burstSeconds: TimeInterval = 0.04
+    // MARK: - Yüz Takibi (FaceTrackingCore: medyan filtre + histerezis + oransal darbe + öğrenen kazanç)
+    private var trackingCore = FaceTrackingCore()
+    private var trackingLoopTask: Task<Void, Never>?
+    private var wasTrackingActive = false
+    private var isPulsing = false            // Şu an bir motor darbesi yürütülüyor mu
+    private var isPhotoCentering = false     // Fotoğraf öncesi ortalama ana döngüyü duraklatır
+    private var trackingMotorRunning = false // Takibin gönderdiği son komut hareket mi?
 
-    // Anti-spin koruma: ard arda yön değişimi sayılır
-    private var lastBurstDirection: RobotCommand? = nil
-    private var flipCount: Int = 0
-    private let flipLimit: Int = 2         // Kaç ard arda flip'ten sonra soğuma
-    private let cooldownSeconds: TimeInterval = 1.5  // Soğuma süresi
-    
     // Işık / Parlaklık takibi
     private var lastBrightness: CGFloat = UIScreen.main.brightness
     private var isInitialized: Bool = false
@@ -78,10 +70,12 @@ final class GismoFaceViewModel: ObservableObject {
                 }
             }
         
-        // Motor ile Akıllı Takip — faceScreenPosition değişince state machine'ı tetikle
+        // Yüz konumu örnekleri (~60 Hz, throttle YOK) → takip çekirdeğinin medyan filtresine
         trackingObserverTask = vision.$faceScreenPosition
-            .throttle(for: .milliseconds(200), scheduler: DispatchQueue.main, latest: true)
-            .sink { [weak self] _ in self?.handleSmartTracking() }
+            .sink { [weak self] pos in
+                guard let self, let pos else { return }
+                self.trackingCore.addSample(x: Double((pos.x - 0.5) * 2.0), at: Self.now())
+            }
     }
     
     private func takePhotoForAI() async -> Data? {
@@ -94,146 +88,142 @@ final class GismoFaceViewModel: ObservableObject {
         return image?.jpegData(compressionQuality: 0.85)
     }
 
-    /// Yüz takibi (isTrackingEnabled) açıkken fotoğraf çekilmeden hemen önce,
-    /// ARKit yüz konumu (veya Vision vücut konumu) verisini kullanarak kişiyi kadrajın tam ortasına (±%8 toleransla) getirir.
+    /// Yüz takibi (isTrackingEnabled) açıkken fotoğraf çekilmeden hemen önce kişiyi
+    /// kadrajın ortasına getirir. Ana takip ile AYNI çekirdeği (öğrenilmiş kazançla) daha dar
+    /// toleransla kullanır; ölçüm her darbeden sonra robot durup görüntü oturunca yapılır.
     private func centerSubjectBeforePhoto() async {
         guard isTrackingEnabled else { return }
         vision.start()
 
-        let centerDeadband: CGFloat = 0.16 // Tam merkez toleransı (-1...+1 ölçeğinde ±0.16)
-        let maxAttempts = 6
+        isPhotoCentering = true
+        defer { isPhotoCentering = false }
+        // Ana döngüde yarım kalmış bir darbe varsa bitmesini bekle
+        while isPulsing { try? await Task.sleep(for: .milliseconds(10)) }
 
-        for step in 1...maxAttempts {
-            // Güncel yatay konumu oku: Önce ARKit yüz merkezi, yoksa Vision vücut merkezi
-            var currentXPos: CGFloat? = nil
-            if let facePos = vision.faceScreenPosition {
-                currentXPos = (facePos.x - 0.5) * 2.0
-            } else if vision.isBodyDetected {
-                currentXPos = vision.bodyOffset.x
-            } else if step == 1 {
-                // İlk adımda henüz frame gelmediyse kısa bir süre bekle ve tekrar kontrol et
-                try? await Task.sleep(for: .milliseconds(180))
-                if let facePos = vision.faceScreenPosition {
-                    currentXPos = (facePos.x - 0.5) * 2.0
-                } else if vision.isBodyDetected {
-                    currentXPos = vision.bodyOffset.x
+        let normalTuning = trackingCore.tuning
+        trackingCore.tuning.startBand = 0.14
+        trackingCore.tuning.stopBand = 0.08
+        trackingCore.tuning.maxSearchPulses = 0
+        defer {
+            trackingCore.tuning = normalTuning
+            trackingCore.reset()
+        }
+
+        let deadline = Self.now() + 3.0
+        var waitedForFace = false
+        while Self.now() < deadline {
+            switch trackingCore.decide(now: Self.now()) {
+            case .pulse(let direction, let ms, let x):
+                await runTrackingPulse(direction: direction, ms: ms, xBefore: x)
+            case .wait(let seconds):
+                if trackingCore.lastDecisionCentered {
+                    print("[PhotoCenter] Subject ortalandı.")
+                    stopTrackingMotorIfNeeded()
+                    return
                 }
-            }
-
-            guard let xPos = currentXPos else {
-                print("[PhotoCenter] Kadrajda yüz/vücut algılanmadı, mevcut açıdan çekiliyor.")
-                break
-            }
-
-            if abs(xPos) <= centerDeadband {
-                print("[PhotoCenter] Subject tam ortalandı (adım \(step), xPos: \(String(format: "%.2f", xPos))).")
-                break
-            }
-
-            // Merkezden uzaklığa göre orantılı mikro-darbe (overshoot yapmadan hassas ortalama)
-            let direction: RobotCommand = xPos > 0 ? .left : .right
-            let pulseMs: Int
-            if abs(xPos) > 0.55 {
-                pulseMs = 36
-            } else if abs(xPos) > 0.32 {
-                pulseMs = 25
-            } else {
-                pulseMs = 18
-            }
-
-            print("[PhotoCenter] Adım \(step)/\(maxAttempts): xPos=\(String(format: "%.2f", xPos)) -> \(direction.rawValue) (\(pulseMs)ms)")
-            currentTrackingCommand = direction
-            try? await WebSocketService.shared.sendCommand(direction, to: robot.id)
-            try? await Task.sleep(for: .milliseconds(pulseMs))
-
-            currentTrackingCommand = .stop
-            try? await WebSocketService.shared.sendCommand(.stop, to: robot.id)
-            // Kamera ve ARKit'in yeni konumu hesaplaması için kısa stabilizasyon
-            try? await Task.sleep(for: .milliseconds(240))
-        }
-
-        currentTrackingCommand = .stop
-        try? await WebSocketService.shared.sendCommand(.stop, to: robot.id)
-        try? await Task.sleep(for: .milliseconds(120))
-    }
-    
-    /// Yalnızca yüz ekranda vardıysa ve merkezden kaymışsa motor komutu gönderir.
-    /// Yüz yoksa (nil) → hemen dur. Vücut takibi motor kontrolde kullanılmaz.
-    private func handleSmartTracking() {
-        guard !isThinking && !showResponse && currentEmotion != .sleeping && isTrackingEnabled else {
-            sendTrackingCommand(.stop)
-            trackingState = .idle
-            flipCount = 0; lastBurstDirection = nil
-            return
-        }
-
-        // Yüz görünmüyorsa anında dur
-        guard let facePos = vision.faceScreenPosition else {
-            sendTrackingCommand(.stop)
-            trackingState = .idle
-            flipCount = 0; lastBurstDirection = nil
-            return
-        }
-
-        // -1 (sol) … 0 (merkez) … +1 (sağ)
-        let xPos = (facePos.x - 0.5) * 2.0
-        let now  = Date()
-        let threshold: CGFloat = 0.65   // Ekran kenarına yakınsa tepki ver (±65%)
-
-        // !! ÖNCE KONTROL: Yüz merkezde mi? Her durumda anında dur !!
-        if abs(xPos) <= threshold {
-            if currentTrackingCommand != .stop { sendTrackingCommand(.stop) }
-            trackingState = .idle
-            flipCount = 0; lastBurstDirection = nil
-            return
-        }
-
-        // Yüz merkezde değil — state machine'e göre davran
-        switch trackingState {
-
-        case .moving(let until):
-            // Burst süresi bitti → dur, settle'a geç
-            if now >= until {
-                sendTrackingCommand(.stop)
-                // Kamera stabilize olsun + ARKit yüzü yeniden yakalasın
-                trackingState = .settling(until: now.addingTimeInterval(0.60))
-            }
-            return  // Burst devam ediyor — müdahale etme
-
-        case .settling(let until):
-            guard now >= until else { return }
-            trackingState = .idle
-
-        case .idle:
-            break
-        }
-
-        // ── Idle: yeni burst değerlendirmesi ──
-        let direction: RobotCommand = xPos > 0 ? .left : .right
-
-        // Anti-spin: ard arda ters yön → zorunlu soğuma
-        if let last = lastBurstDirection, last != direction {
-            flipCount += 1
-            if flipCount >= flipLimit {
-                print("[Tracking] Anti-spin: \(cooldownSeconds)sn soğuma")
-                sendTrackingCommand(.stop)
-                trackingState = .settling(until: now.addingTimeInterval(cooldownSeconds))
-                flipCount = 0; lastBurstDirection = nil
+                try? await Task.sleep(for: .seconds(min(max(seconds, 0.01), 0.2)))
+            case .faceLost:
+                // Kamera yeni başladıysa ilk karelere kısa süre tanı
+                if !waitedForFace {
+                    waitedForFace = true
+                    try? await Task.sleep(for: .milliseconds(250))
+                    continue
+                }
+                print("[PhotoCenter] Kadrajda yüz yok, mevcut açıdan çekiliyor.")
+                stopTrackingMotorIfNeeded()
                 return
             }
-        } else if lastBurstDirection == direction {
-            flipCount = 0
         }
-        lastBurstDirection = direction
-
-        sendTrackingCommand(direction)
-        trackingState = .moving(until: now.addingTimeInterval(burstSeconds))
+        stopTrackingMotorIfNeeded()
     }
 
-    private func sendTrackingCommand(_ cmd: RobotCommand) {
+    // MARK: - Yüz Takibi Döngüsü
+
+    private static func now() -> Double { ProcessInfo.processInfo.systemUptime }
+
+    private var canTrack: Bool {
+        isTrackingEnabled && !isThinking && !showResponse && currentEmotion != .sleeping && !isPhotoCentering
+    }
+
+    private func startTrackingLoop() {
+        guard trackingLoopTask == nil else { return }
+        trackingLoopTask = Task { [weak self] in
+            while !Task.isCancelled {
+                guard let delay = await self?.trackingStep() else { return }
+                if delay > 0 {
+                    try? await Task.sleep(for: .seconds(delay), tolerance: .milliseconds(2))
+                }
+            }
+        }
+    }
+
+    private func stopTrackingLoop() {
+        trackingLoopTask?.cancel()
+        trackingLoopTask = nil
+        stopTrackingMotorIfNeeded()
+        trackingCore.reset()
+        wasTrackingActive = false
+    }
+
+    /// Tek karar adımı; bir sonraki adıma kadar beklenecek süreyi döndürür.
+    private func trackingStep() async -> Double {
+        if isPhotoCentering { return 0.05 }   // Ortalama rutini motoru yönetiyor
+
+        guard canTrack else {
+            if wasTrackingActive {
+                stopTrackingMotorIfNeeded()
+                trackingCore.reset()
+                wasTrackingActive = false
+            }
+            return 0.1
+        }
+        if !wasTrackingActive {
+            trackingCore.reset()
+            wasTrackingActive = true
+        }
+
+        switch trackingCore.decide(now: Self.now()) {
+        case .wait(let seconds):
+            stopTrackingMotorIfNeeded()
+            return min(max(seconds, 0.01), 0.2)
+        case .faceLost:
+            stopTrackingMotorIfNeeded()
+            return 0.05
+        case .pulse(let direction, let ms, let x):
+            await runTrackingPulse(direction: direction, ms: ms, xBefore: x)
+            return 0
+        }
+    }
+
+    /// Hareket → tam süre bekle → DUR. Komutlar ack beklenmeden sıralı gönderilir;
+    /// görev iptal edilse bile DUR mutlaka gönderilir.
+    private func runTrackingPulse(direction: Int, ms: Double, xBefore: Double) async {
+        isPulsing = true
+        defer { isPulsing = false }
+
+        // x > 0 → yüz kadrajın sağında → robot sola döner (kamera montajına göre)
+        sendTrackingMotor(direction > 0 ? .left : .right)
+        try? await Task.sleep(for: .milliseconds(Int(ms.rounded())), tolerance: .milliseconds(1))
+        sendTrackingMotor(.stop)
+
+        // Robota ulaşma gecikmesi ≈ ölçülen RTT; jitter için pay bırak
+        let latency = WebSocketService.shared.commandRoundTrip * 1.3 + 0.03
+        trackingCore.didFinishPulse(direction: direction, ms: ms, xBefore: xBefore,
+                                    at: Self.now(), latency: latency)
+    }
+
+    private func sendTrackingMotor(_ cmd: RobotCommand) {
         currentTrackingCommand = cmd
-        Task {
-            try? await WebSocketService.shared.sendCommand(cmd, to: self.robot.id)
+        trackingMotorRunning = cmd != .stop
+        WebSocketService.shared.sendRealtimeCommand(cmd, to: robot.id)
+    }
+
+    /// Yalnızca takip robotu hareket ettirdiyse DUR gönderir (duygu hareketlerini bölmez, spam yok)
+    private func stopTrackingMotorIfNeeded() {
+        if trackingMotorRunning {
+            sendTrackingMotor(.stop)
+        } else if currentTrackingCommand != .stop {
+            currentTrackingCommand = .stop
         }
     }
 
@@ -250,6 +240,7 @@ final class GismoFaceViewModel: ObservableObject {
         geminiLive.prewarm(apiKey: gemini.apiKey)
         setupVoice()
         vision.start() // Yüz takibini başlat
+        startTrackingLoop()
     }
 
     func onDisappear() {
@@ -260,6 +251,7 @@ final class GismoFaceViewModel: ObservableObject {
         speechLevel = 0
         voiceEngine.stop()
         vision.stop() // Yüz takibini durdur
+        stopTrackingLoop()
         emotionResetTask?.cancel()
         responseHideTask?.cancel()
         transcriptSyncTask?.cancel()
