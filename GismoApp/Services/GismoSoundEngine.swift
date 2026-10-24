@@ -345,9 +345,15 @@ final class GismoSoundEngine: NSObject, AVAudioPlayerDelegate, AVSpeechSynthesiz
         return AVSpeechSynthesisVoice(language: "tr-TR")
     }
 
-    // MARK: - Clean Studio Futuristic Assistant DSP (JARVIS / Friday Style)
-    // Kelimeleri, diksiyonu ve doğal perdeyi ASLA bozmaz (0% bitcrush, 0% ring-mod, 0% pitch-warp).
-    // Sadece stüdyo berraklığı (Presence EQ) + çok hafif holografik erken yansıma (Early Reflection) uygular.
+    // MARK: - Cute Robot Voice DSP (Gemini sesi korunur, üzerine hafif filtre dokunuşları)
+    // TTS modeli değişmez. CuteRobotVoiceDSP; hafif perde/formant yükseltme (süre korunur),
+    // küçük-hoparlör EQ'su, düşük karışımlı metalik rezonans ve ring-mod parıltısı uygular.
+    // Duyguya göre perde ve robotiklik dozu çok az değişir; karakter sesi her zaman aynı kalır.
+
+    /// Robot ses efektini tamamen kapatmak için UserDefaults "gismoCuteRobotVoiceEnabled" = false
+    private var isCuteRobotVoiceEnabled: Bool {
+        UserDefaults.standard.object(forKey: "gismoCuteRobotVoiceEnabled") as? Bool ?? true
+    }
 
     private func processCuteRobotVoice(
         samples: [Float],
@@ -355,58 +361,39 @@ final class GismoSoundEngine: NSObject, AVAudioPlayerDelegate, AVSpeechSynthesiz
         emotion: GismoEmotionName
     ) -> [Float] {
         guard samples.count > 64 else { return samples }
-        let count = samples.count
-
-        // 1. 105 Hz Studio High-Pass Filter (boğuk alt basları temizler, sesi berraklaştırır)
-        var highPassed = [Float](repeating: 0, count: count)
-        let hpRc = 1.0 / (2.0 * .pi * 105.0)
-        let dt = 1.0 / sampleRate
-        let hpAlpha = Float(hpRc / (hpRc + dt))
-        highPassed[0] = samples[0]
-        for i in 1..<count {
-            highPassed[i] = hpAlpha * (highPassed[i - 1] + samples[i] - samples[i - 1])
+        var style = Self.cuteRobotStyle(for: emotion)
+        if !isCuteRobotVoiceEnabled {
+            // Efekt kapalı: yalnızca temiz EQ + normalize (perde/robotik tını yok)
+            style.pitchSemitones = 0
+            style.combMix = 0
+            style.ringMix = 0
+            style.highPassHz = 105
         }
+        return CuteRobotVoiceDSP.process(samples: samples, sampleRate: sampleRate, style: style)
+    }
 
-        // 2. 2.6 kHz Presence / Air Boost (JARVIS / Cuma tarzı net stüdyo diksiyonu)
-        // Alçak geçiren bileşeni çıkararak üst frekansları (tiz/presence) %24 oranında parlatır
-        let lpRc = 1.0 / (2.0 * .pi * 2600.0)
-        let lpAlpha = Float(dt / (lpRc + dt))
-        var lowState: Float = highPassed[0]
-        var eqOut = [Float](repeating: 0, count: count)
-        for i in 0..<count {
-            let x = highPassed[i]
-            lowState += lpAlpha * (x - lowState)
-            let highComponent = x - lowState
-            eqOut[i] = x + 0.24 * highComponent
+    private static func cuteRobotStyle(for emotion: GismoEmotionName) -> CuteRobotVoiceDSP.Style {
+        var style = CuteRobotVoiceDSP.Style.default
+        switch emotion {
+        case .happy:
+            style.pitchSemitones = 3.4
+        case .veryHappy, .surprised:
+            style.pitchSemitones = 3.8
+            style.ringMix = 0.09
+        case .sad, .sleeping:
+            style.pitchSemitones = 2.2
+            style.combMix = 0.16
+            style.ringMix = 0.06
+        case .angry:
+            style.pitchSemitones = 2.4
+            style.combFeedback = 0.42
+            style.combMix = 0.24
+        case .thoughtful:
+            style.pitchSemitones = 2.7
+        case .neutral, .listening:
+            break
         }
-
-        // 3. Çok hafif Holografik Stüdyo Erken Yansıması (9.5ms + 16.5ms çift tap, 0 geri besleme)
-        // Metalik çınlama yapmadan fütüristik asistan derinliği katar
-        let tap1 = max(1, Int(sampleRate * 0.0095))
-        let tap2 = max(2, Int(sampleRate * 0.0165))
-        var studioOut = [Float](repeating: 0, count: count)
-        for i in 0..<count {
-            let d1: Float = (i >= tap1) ? eqOut[i - tap1] : 0
-            let d2: Float = (i >= tap2) ? eqOut[i - tap2] : 0
-            let mixed = 0.87 * eqOut[i] + 0.09 * d1 + 0.04 * d2
-            // Şeffaf soft-knee limiter (cızırtısız, dolgun stüdyo seviyesi)
-            studioOut[i] = Float(tanh(Double(mixed) * 1.15))
-        }
-
-        // 4. Peak Normalize (0.95 — net ve güçlü ses seviyesi)
-        var peak: Float = 0
-        for s in studioOut {
-            let a = abs(s)
-            if a > peak { peak = a }
-        }
-        if peak > 0.001 {
-            let gain = Float(0.95) / peak
-            for i in 0..<count {
-                studioOut[i] = max(-1.0, min(1.0, studioOut[i] * gain))
-            }
-        }
-
-        return studioOut
+        return style
     }
 
     // MARK: - Decode WAV or Raw 16-bit PCM
