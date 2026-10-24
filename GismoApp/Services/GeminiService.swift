@@ -37,11 +37,15 @@ final class GeminiService {
     
     // Fotoğraf çekme closure'u (ViewModel'dan atanacak)
     var onTakePhoto: (() async -> Data?)?
+    // Galeriye KAYDETMEDEN analiz için kamera görüntüsü (ViewModel'dan atanacak)
+    var onCaptureForAnalysis: (() async -> Data?)?
 
     // Konuşma geçmişi (multi-turn)
     private var history: [[String: Any]] = []
 
-    private let systemPrompt = """
+    private var systemPrompt: String { PhoneIntegrationService.currentDateLine() + "\n" + baseSystemPrompt }
+
+    private let baseSystemPrompt = """
     Sen Gismo, sevimli ve empatik bir Türkçe konuşan robot yardımcısın. Kısa yanıtlar ver (max 2 cümle).
     Her yanıtın sonuna MUTLAKA şu etiketi ekle (başka hiçbir şey ekleme):
     ###EMO:duygu|süre|MOV:komutlar###
@@ -54,6 +58,7 @@ final class GeminiService {
     ÖNEMLİ GÜVENLİK KURALI: Kullanıcı SMS veya E-posta göndermek istediğinde ASLA ilgili aracı anında çalıştırma! Önce alıcıyı ve mesajı kullanıcıya tekrar et ve "Mesajı gönderiyorum, onaylıyor musun?" diye sor. SADECE kullanıcı "evet, onayla, gönder" gibi onaylayıcı bir cevap verirse `sendSMS` veya `sendEmail` aracını çalıştır.
     Kullanıcı sana belirli bir santimetre (cm) gitmeni söylerse (Örn: "1 cm ileri gel", "5 cm sola dön"), robotun tekerlek ataletini (kaymasını) hesaba katarak her 1 cm için tam olarak 15ms hesapla (Örn: 1 cm = 15, 2 cm = 30, 5 cm = 75). Robotun sarsılmaması için hareket sürelerini daima çok düşük tut.
     Eğer kullanıcı "etrafında tam tur dön", "360 derece dön" gibi bir şey isterse, tek bir yöne 1000ms güç vererek bunu başarabilirsin (Örn: MOV:L,1000;S).
+    \(PhoneIntegrationService.promptSummary)
     Kullanıcı Drive'daki bir dosyayı okumak/özetlemek isterse doğrudan `readDriveFile` aracına `fileName` (veya biliyorsan `fileId`) vererek tek adımda okuyabilirsin.
     Kullanıcı Drive'a not/özet/metin kaydetmek isterse `createDriveFile` aracını kullan.
     FOTOĞRAF KURALLARI:
@@ -71,7 +76,9 @@ final class GeminiService {
     Tamam, 5 cm sola dönüyorum. ###EMO:happy|3.0|MOV:L,75;S###
     """
 
-    static let sharedFunctionDeclarations: [[String: Any]] = [
+    static let sharedFunctionDeclarations: [[String: Any]] = baseFunctionDeclarations + PhoneIntegrationService.functionDeclarations
+
+    private static let baseFunctionDeclarations: [[String: Any]] = [
         [
             "name": "moveRobot",
             "description": "Robotu fiziksel olarak hareket ettirir (F=İleri, B=Geri, L=Sol, R=Sağ, S=Dur). Her 1 cm için 15ms kullan.",
@@ -334,7 +341,7 @@ final class GeminiService {
             let (toolResult, motorSteps) = await executeLiveTool(name: name, args: args)
 
             // Okuma/Arama araçlarında sonucu Gemini'ye özetlet (includeTools: false ile sonsuz döngüyü önle)
-            let summarizationTools: Set<String> = ["readEmails", "searchDrive", "readDriveFile", "searchGooglePhotos"]
+            let summarizationTools: Set<String> = Set(["readEmails", "searchDrive", "readDriveFile", "searchGooglePhotos"]).union(PhoneIntegrationService.readOnlyToolNames)
             if summarizationTools.contains(name) {
                 let summaryPrompt = """
                 Kullanıcının isteği: \(userText)
@@ -698,9 +705,65 @@ final class GeminiService {
                 return ("Rehber erişim hatası: \(error.localizedDescription)", [])
             }
 
+        case "analyzeCamera":
+            if let msg = await PhoneIntegrationService.shared.cameraReadyMessage() { return (msg, []) }
+            let question = (args["question"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let capture = onCaptureForAnalysis, let imageData = await capture() else {
+                return ("Kameradan görüntü alınamadı.", [])
+            }
+            do {
+                let answer = try await analyzeImage(imageData, question: question.isEmpty ? "Bu görüntüde ne görüyorsun?" : question)
+                return ("Kamera görüntüsü analizi: \(answer)", [])
+            } catch {
+                return ("Görüntü analiz hatası: \(error.localizedDescription)", [])
+            }
+
         default:
+            if let result = await PhoneIntegrationService.shared.execute(name: name, args: args) {
+                return (result, [])
+            }
             return ("Bilinmeyen araç: \(name)", [])
         }
+    }
+
+    /// Kamera görüntüsünü Gemini (multimodal) ile analiz eder
+    func analyzeImage(_ imageData: Data, question: String) async throws -> String {
+        let body: [String: Any] = [
+            "contents": [[
+                "role": "user",
+                "parts": [
+                    ["inline_data": ["mime_type": "image/jpeg", "data": imageData.base64EncodedString()]],
+                    ["text": "Sen bir robotun gözüsün; bu görüntü robotun ön kamerasından (kullanıcıya bakarak) alındı. Türkçe, kısa ve net cevap ver (en fazla 3 cümle). Soru: \(question)"]
+                ]
+            ]],
+            "generationConfig": ["temperature": 0.4, "maxOutputTokens": 400]
+        ]
+        let bodyData = try JSONSerialization.data(withJSONObject: body)
+        var lastError: Error = GeminiError.parseError
+        for base in [endpoint, fallbackEndpoint] {
+            guard let url = URL(string: "\(base)?key=\(apiKey)") else { continue }
+            var req = URLRequest(url: url)
+            req.httpMethod = "POST"
+            req.timeoutInterval = 25
+            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            req.httpBody = bodyData
+            do {
+                let (data, resp) = try await URLSession.shared.data(for: req)
+                guard let http = resp as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+                    lastError = GeminiError.httpError((resp as? HTTPURLResponse)?.statusCode ?? 0, Self.extractAPIErrorMessage(from: data))
+                    continue
+                }
+                if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let parts = ((json["candidates"] as? [[String: Any]])?.first?["content"] as? [String: Any])?["parts"] as? [[String: Any]] {
+                    let text = parts.compactMap { $0["text"] as? String }.joined().trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !text.isEmpty { return text }
+                }
+                lastError = GeminiError.parseError
+            } catch {
+                lastError = error
+            }
+        }
+        throw lastError
     }
 
     private static func normalizeEmailAddress(_ raw: String) -> String {
@@ -750,7 +813,11 @@ final class GeminiLiveService {
         "models/gemini-2.0-flash-live-001"
     ]
 
-    private let liveSystemPrompt = """
+    private var liveSystemPrompt: String {
+        PhoneIntegrationService.currentDateLine() + "\n" + baseLiveSystemPrompt + "\n" + PhoneIntegrationService.promptSummary
+    }
+
+    private let baseLiveSystemPrompt = """
     Sen Gismo adında, JARVIS ve Cuma (Friday) tarzında zeki, fütüristik, empatik ve çok doğal Türkçe konuşan bir yapay zeka robot asistansın.
     Yanıtların her zaman kısa (en fazla 1-2 cümle), akıcı, berrak ve doğal Türkçe diksiyonla olsun.
     KESİN KURAL: Konuşurken ASLA ###EMO gibi etiketler, kodlar veya parantez içi açıklamalar söyleme! Sadece doğrudan kullanıcıya söylediğin doğal Türkçe cümleyi seslendir.

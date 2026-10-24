@@ -59,6 +59,11 @@ final class GismoFaceViewModel: ObservableObject {
             guard let self = self else { return nil }
             return await self.takePhotoForAI()
         }
+        // "Ne görüyorsun?" gibi analizler için galeriye kaydetmeden görüntü al
+        gemini.onCaptureForAnalysis = { [weak self] in
+            guard let self = self else { return nil }
+            return await self.captureFrameForAnalysis()
+        }
         
         // Gülümseme algılandığında tepki ver (konuşma esnasında ağız hareketlerinin melodi döngüsüne girmesini önle)
         smileObserverTask = vision.$isSmiling
@@ -86,6 +91,13 @@ final class GismoFaceViewModel: ObservableObject {
         defer { self.vision.start() }
         let image = await self.camera.takePhoto()
         return image?.jpegData(compressionQuality: 0.85)
+    }
+
+    private func captureFrameForAnalysis() async -> Data? {
+        self.vision.stop()
+        defer { self.vision.start() }
+        let image = await self.camera.takePhoto(saveToGallery: false)
+        return image?.jpegData(compressionQuality: 0.7)
     }
 
     /// Yüz takibi (isTrackingEnabled) açıkken fotoğraf çekilmeden hemen önce kişiyi

@@ -46,7 +46,30 @@
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Gismo çektiği fotoğrafı galerine kaydetmek için izin istiyor.</string>
 	<key>NSContactsUsageDescription</key>
-	<string>Gismo'nun söylediğiniz kişilere doğrudan SMS atabilmesi için rehberinize erişmesi gerekiyor.</string>
+	<string>Gismo rehberindeki kişileri bulup numaralarını, doğum günlerini söyleyebilmek, onları arayabilmek ve mesaj atabilmek için rehberine erişmek istiyor.</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>Gismo takvimindeki etkinlikleri sana söyleyebilmek ve yeni etkinlik ekleyebilmek için takvimine erişmek istiyor.</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>Gismo takvimindeki etkinlikleri sana söyleyebilmek ve yeni etkinlik ekleyebilmek için takvimine erişmek istiyor.</string>
+	<key>NSRemindersUsageDescription</key>
+	<string>Gismo yapılacaklarını okuyabilmek ve yeni hatırlatıcı ekleyebilmek için Anımsatıcılar'a erişmek istiyor.</string>
+	<key>NSRemindersFullAccessUsageDescription</key>
+	<string>Gismo yapılacaklarını okuyabilmek ve yeni hatırlatıcı ekleyebilmek için Anımsatıcılar'a erişmek istiyor.</string>
+	<key>NSAlarmKitUsageDescription</key>
+	<string>Gismo senin için alarm ve zamanlayıcı kurabilmek istiyor.</string>
+	<key>NSHealthShareUsageDescription</key>
+	<string>Gismo adım, nabız, uyku ve aktivite gibi sağlık verilerinle ilgili sorularını yanıtlayabilmek için Sağlık verilerini okumak istiyor.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>Gismo Sağlık uygulamasına veri yazmaz; bu izin yalnızca sistem gereği istenir.</string>
+	<key>NSMotionUsageDescription</key>
+	<string>Gismo adım sayını, yürüdüğün mesafeyi ve hareket durumunu söyleyebilmek için hareket verilerine erişmek istiyor.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Gismo nerede olduğunu söyleyebilmek, hava durumunu ve yol tarifini verebilmek için konumuna erişmek istiyor.</string>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>whatsapp</string>
+		<string>tel</string>
+	</array>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Gismo seni dinleyebilmek için konuşma tanıma iznine ihtiyaç duyuyor.</string>
 	<key>UILaunchStoryboardName</key>

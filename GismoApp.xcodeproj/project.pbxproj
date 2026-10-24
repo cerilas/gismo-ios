@@ -22,6 +22,7 @@
 		738BA7DBBC34BC504B9F5BD7 /* GismoFaceViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6389410929375F84F7529966 /* GismoFaceViewModel.swift */; };
 		A1C0FFEE0000000000000003 /* FaceTrackingController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0FFEE0000000000000004 /* FaceTrackingController.swift */; };
 		7661EF2C1A172A5C266EFF4F /* GeminiService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 292A1291A9152C8613562BEF /* GeminiService.swift */; };
+		A1C0FFEE0000000000000005 /* PhoneIntegrationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0FFEE0000000000000006 /* PhoneIntegrationService.swift */; };
 		8E624FF1ECDE5630CF96CBF7 /* GoogleDriveService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56A27BF6EFD3A311403B7BCF /* GoogleDriveService.swift */; };
 		9891F289347AEEAE25481580 /* DatabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C430B39F51B6C1F67CCBE335 /* DatabaseService.swift */; };
 		9C3D9C1E2125BE52307869F8 /* OrientationController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7226910B37B830114DDBEC93 /* OrientationController.swift */; };
@@ -35,6 +36,7 @@
 		A1C0FFEE0000000000000001 /* CuteRobotVoiceDSP.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0FFEE0000000000000002 /* CuteRobotVoiceDSP.swift */; };
 		D0A2F8C3AF796F83F4C5DD95 /* SplashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4D2423611CA26FDB1175486 /* SplashView.swift */; };
 		E6F9C998B3F6AA265C478CE4 /* GismoFaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DE70479E34D67720820F8AB /* GismoFaceView.swift */; };
+		A1C0FFEE0000000000000007 /* PhoneIntegrationsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0FFEE0000000000000008 /* PhoneIntegrationsCard.swift */; };
 		E957EF1DFE1ED02C386C7245 /* RobotListViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 802A82449946EE717D78AEC4 /* RobotListViewModel.swift */; };
 		EE460D3B07F1D3FA85BCDBCC /* Step1ConnectView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 223BE30460AE695E9DC8F8D9 /* Step1ConnectView.swift */; };
 		FAC29F626FA84D908A5046A1 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 18C1BF4CA0DFCB09BEAF3570 /* Assets.xcassets */; };
@@ -50,6 +52,7 @@
 		263210368D861D67BA44D571 /* Step3PasswordView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Step3PasswordView.swift; sourceTree = "<group>"; };
 		277243752388FCB4C4351036 /* Step2WiFiScanView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Step2WiFiScanView.swift; sourceTree = "<group>"; };
 		292A1291A9152C8613562BEF /* GeminiService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiService.swift; sourceTree = "<group>"; };
+		A1C0FFEE0000000000000006 /* PhoneIntegrationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneIntegrationService.swift; sourceTree = "<group>"; };
 		2C5731916A2F63AB0610B699 /* GismoSoundEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GismoSoundEngine.swift; sourceTree = "<group>"; };
 		A1C0FFEE0000000000000002 /* CuteRobotVoiceDSP.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CuteRobotVoiceDSP.swift; sourceTree = "<group>"; };
 		30F51A6808D3B956CCFDAA07 /* JoystickView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JoystickView.swift; sourceTree = "<group>"; };
@@ -66,6 +69,7 @@
 		802A82449946EE717D78AEC4 /* RobotListViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RobotListViewModel.swift; sourceTree = "<group>"; };
 		88713715C5C1BDED41CCF3C0 /* SetupViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupViewModel.swift; sourceTree = "<group>"; };
 		8DE70479E34D67720820F8AB /* GismoFaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GismoFaceView.swift; sourceTree = "<group>"; };
+		A1C0FFEE0000000000000008 /* PhoneIntegrationsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneIntegrationsCard.swift; sourceTree = "<group>"; };
 		9D506989F006F0E05585D0A2 /* GismoCameraService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GismoCameraService.swift; sourceTree = "<group>"; };
 		A286DF2753CE750907F9FC92 /* WiFiNetwork.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WiFiNetwork.swift; sourceTree = "<group>"; };
 		AD50252591D1738C9504E4DE /* GismoVoiceEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GismoVoiceEngine.swift; sourceTree = "<group>"; };
@@ -126,6 +130,7 @@
 				C430B39F51B6C1F67CCBE335 /* DatabaseService.swift */,
 				4F4666CDDFB137F6067FA30C /* ESPService.swift */,
 				292A1291A9152C8613562BEF /* GeminiService.swift */,
+				A1C0FFEE0000000000000006 /* PhoneIntegrationService.swift */,
 				9D506989F006F0E05585D0A2 /* GismoCameraService.swift */,
 				2C5731916A2F63AB0610B699 /* GismoSoundEngine.swift */,
 				A1C0FFEE0000000000000002 /* CuteRobotVoiceDSP.swift */,
@@ -183,6 +188,7 @@
 			isa = PBXGroup;
 			children = (
 				8DE70479E34D67720820F8AB /* GismoFaceView.swift */,
+				A1C0FFEE0000000000000008 /* PhoneIntegrationsCard.swift */,
 			);
 			path = Face;
 			sourceTree = "<group>";
@@ -316,9 +322,11 @@
 				6A9A77F084432E89043CEC91 /* DesignSystem.swift in Sources */,
 				6D82929E081CAD69C2AE34BD /* ESPService.swift in Sources */,
 				7661EF2C1A172A5C266EFF4F /* GeminiService.swift in Sources */,
+				A1C0FFEE0000000000000005 /* PhoneIntegrationService.swift in Sources */,
 				6EFD514CAB0B5E341EAF304F /* GismoApp.swift in Sources */,
 				0E816D4FDA9E3BA3B533A111 /* GismoCameraService.swift in Sources */,
 				E6F9C998B3F6AA265C478CE4 /* GismoFaceView.swift in Sources */,
+				A1C0FFEE0000000000000007 /* PhoneIntegrationsCard.swift in Sources */,
 				738BA7DBBC34BC504B9F5BD7 /* GismoFaceViewModel.swift in Sources */,
 				A1C0FFEE0000000000000003 /* FaceTrackingController.swift in Sources */,
 				C86F3889F135E3C75F9017BE /* GismoSoundEngine.swift in Sources */,
@@ -472,7 +480,13 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = TCJ3Q8HPWS;
 				ENABLE_PREVIEWS = YES;
+				CODE_SIGN_ENTITLEMENTS = GismoApp/GismoApp.entitlements;
 				INFOPLIST_FILE = GismoApp/Info.plist;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-weak_framework",
+					AlarmKit,
+				);
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -495,7 +509,13 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = TCJ3Q8HPWS;
 				ENABLE_PREVIEWS = YES;
+				CODE_SIGN_ENTITLEMENTS = GismoApp/GismoApp.entitlements;
 				INFOPLIST_FILE = GismoApp/Info.plist;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-weak_framework",
+					AlarmKit,
+				);
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

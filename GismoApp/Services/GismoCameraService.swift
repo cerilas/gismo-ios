@@ -19,12 +19,13 @@ final class GismoCameraService: NSObject, ObservableObject {
 
     // MARK: - Public
 
+    /// - saveToGallery: false ise (örn. yapay zekanın "ne görüyorsun" analizi) galeriye kaydedilmez
     @discardableResult
-    func takePhoto() async -> UIImage? {
+    func takePhoto(saveToGallery: Bool = true) async -> UIImage? {
         guard !isCapturing else { return nil }
 
         let camOK  = await requestCamera()
-        let photoOK = await requestPhotoLibrary()
+        let photoOK = saveToGallery ? await requestPhotoLibrary() : false
         guard camOK else {
             print("[Camera] Kamera izni yok")
             return nil
@@ -90,7 +91,9 @@ final class GismoCameraService: NSObject, ObservableObject {
         showPreview   = true
 
         // Galeriye kaydet
-        if photoOK {
+        if !saveToGallery {
+            // Yalnızca analiz amaçlı çekim — galeriye kaydetme
+        } else if photoOK {
             await Self.saveToPhotoLibrary(image)
         } else {
             // İzin durumu belirsizse fallback olarak dene

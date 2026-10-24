@@ -1266,7 +1266,7 @@ struct IntegrationsView: View {
                                 .font(.system(size: 28, weight: .black, design: .rounded))
                                 .foregroundColor(.white)
                             
-                            Text("Gismo'yu yetkilendirerek senin adına e-posta yönetmesini, fotoğraf çekip göndermesini, Google Drive ve Google Fotoğraflar'ına tam erişmesini sağlayabilirsin.")
+                            Text("Gismo'yu yetkilendirerek telefonunun kamerası, rehberi, takvimi, alarmları, sağlık ve konum verileriyle; ayrıca e-posta, Google Drive ve Google Fotoğraflar'ınla senin adına çalışmasını sağlayabilirsin.")
                                 .font(.system(size: 14, weight: .medium, design: .rounded))
                                 .foregroundColor(.gSubtext)
                                 .lineSpacing(4)
@@ -1276,6 +1276,10 @@ struct IntegrationsView: View {
                         .padding(.horizontal, 22)
                         .padding(.top, 12)
                         
+                        // Telefon (Varsayılan) Card — iPhone yetenekleri
+                        PhoneIntegrationsCard()
+                            .padding(.horizontal, 20)
+
                         // Google Servisleri Card
                         VStack(alignment: .leading, spacing: 18) {
                             HStack(spacing: 15) {

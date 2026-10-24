@@ -31,6 +31,8 @@ targets:
         MARKETING_VERSION: "1.0.0"
         CURRENT_PROJECT_VERSION: "1"
         INFOPLIST_FILE: GismoApp/Info.plist
+        CODE_SIGN_ENTITLEMENTS: GismoApp/GismoApp.entitlements
+        OTHER_LDFLAGS: ["$(inherited)", "-weak_framework", "AlarmKit"]
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         ENABLE_PREVIEWS: YES
