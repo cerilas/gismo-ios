@@ -1,230 +1,176 @@
 import SwiftUI
 
 struct SplashView: View {
-    @State private var logoScale: CGFloat = 0.65
-    @State private var logoOpacity: Double = 0
-    @State private var glowRadius: CGFloat = 8
-    @State private var textOpacity: Double = 0
-    @State private var ringScale: CGFloat = 0.55
-    @State private var ringOpacity: Double = 0
-    @State private var orbitRotation: Double = 0
-    @State private var eyeBlink: Bool = false
-    @State private var bootProgress: CGFloat = 0.08
+    @State private var appeared = false
+    @State private var isBlinking = true
+    @State private var isSmiling = false
+    @State private var floatPhase = false
+    @State private var lookOffset: CGSize = .zero
+    @State private var auraPulse = false
+
+    private let primaryColor   = Color(hex: "00D4AA")
+    private let secondaryColor = Color(hex: "72DDF7")
 
     var body: some View {
-        ZStack {
-            GismoBackground()
+        GeometryReader { geometry in
+            let baseSize  = min(geometry.size.width, geometry.size.height) * 0.85
+            let eyeWidth  = baseSize * 0.34
+            let eyeHeight = baseSize * (isSmiling ? 0.21 : 0.25)
+            let eyeSpace  = baseSize * 0.13
 
-            // Center ambient core halo
-            Circle()
-                .fill(
-                    RadialGradient(
-                        colors: [Color.gAccent.opacity(0.26), Color.gAccent2.opacity(0.10), .clear],
-                        center: .center,
-                        startRadius: 10,
-                        endRadius: 210
-                    )
+            ZStack {
+                // Saf karanlık robot yüzü arka planı + yumuşak duygu parıltısı
+                LinearGradient(
+                    colors: [
+                        Color(hex: "05050A"),
+                        (isSmiling ? primaryColor : secondaryColor).opacity(0.18),
+                        Color(hex: "080812")
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
                 )
-                .frame(width: 420, height: 420)
-                .scaleEffect(ringScale)
-                .opacity(ringOpacity)
+                .ignoresSafeArea()
 
-            // Outer dashed telemetry orbit ring
-            Circle()
-                .stroke(
-                    LinearGradient(
-                        colors: [Color.gAccent2.opacity(0.35), Color.gAccent.opacity(0.08), Color.gSuccess.opacity(0.30)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    style: StrokeStyle(lineWidth: 1.2, dash: [6, 10])
+                RadialGradient(
+                    colors: [
+                        (isSmiling ? primaryColor : secondaryColor).opacity(0.32),
+                        .clear
+                    ],
+                    center: .center,
+                    startRadius: baseSize * 0.06,
+                    endRadius: baseSize * 0.78
                 )
-                .frame(width: 268, height: 268)
-                .rotationEffect(.degrees(orbitRotation))
-                .scaleEffect(ringScale)
-                .opacity(ringOpacity * 0.85)
+                .scaleEffect(auraPulse ? 1.08 : 0.94)
+                .ignoresSafeArea()
 
-            // Inner glowing arc ring
-            Circle()
-                .trim(from: 0.08, to: 0.82)
-                .stroke(
-                    LinearGradient.accent,
-                    style: StrokeStyle(lineWidth: 2, lineCap: .round)
-                )
-                .frame(width: 204, height: 204)
-                .rotationEffect(.degrees(-orbitRotation * 1.3))
-                .scaleEffect(ringScale)
-                .opacity(ringOpacity)
+                // Yalnızca Gismo'nun Animasyonlu Yüzü (Gözler + Ağız)
+                VStack(spacing: baseSize * 0.08) {
+                    // Gözler
+                    HStack(spacing: eyeSpace) {
+                        splashEye(width: eyeWidth, height: eyeHeight)
+                        splashEye(width: eyeWidth, height: eyeHeight)
+                    }
+                    .offset(x: lookOffset.width, y: lookOffset.height + (floatPhase ? -6 : 4))
 
-            VStack(spacing: 32) {
-                Spacer()
-
-                // Futuristic Gismo Core Emblem
-                ZStack {
-                    // Pulsing neon aura
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [Color.gAccent.opacity(0.45), Color.gAccent2.opacity(0.35)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 138, height: 138)
-                        .blur(radius: glowRadius)
-
-                    // Glassmorphic chassis
-                    RoundedRectangle(cornerRadius: 38, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [Color.gSurface2, Color(hex: "0C0E1A")],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 126, height: 126)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 38, style: .continuous)
+                    // Ağız (Nötr kapsülden mutlu gülümsemeye geçiş)
+                    ZStack {
+                        if isSmiling {
+                            SplashSmileShape(depth: baseSize * 0.11)
                                 .stroke(
                                     LinearGradient(
-                                        colors: [Color.gAccent2.opacity(0.9), Color.gAccent.opacity(0.6), Color.white.opacity(0.15)],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
+                                        colors: [primaryColor, secondaryColor],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
                                     ),
-                                    lineWidth: 1.8
+                                    style: StrokeStyle(lineWidth: max(8, baseSize * 0.024), lineCap: .round)
                                 )
-                        )
-                        .shadow(color: Color.gAccent.opacity(0.35), radius: 24, x: 0, y: 12)
-
-                    // Gismo Cyber Visor & Eyes
-                    VStack(spacing: 12) {
-                        HStack(spacing: 18) {
-                            gismoEyeCapsule
-                            gismoEyeCapsule
+                                .frame(width: baseSize * 0.28, height: baseSize * 0.14)
+                                .shadow(color: primaryColor.opacity(0.75), radius: 14)
+                                .transition(.scale(scale: 0.8).combined(with: .opacity))
+                        } else {
+                            Capsule()
+                                .fill(secondaryColor.opacity(0.78))
+                                .frame(width: baseSize * 0.20, height: max(7, baseSize * 0.020))
+                                .shadow(color: secondaryColor.opacity(0.6), radius: 10)
+                                .transition(.opacity)
                         }
-
-                        // Subtle happy cyber-mouth arc
-                        Capsule()
-                            .fill(LinearGradient.cyberCyan)
-                            .frame(width: 26, height: 4)
-                            .shadow(color: Color.gCyan.opacity(0.8), radius: 6)
                     }
+                    .offset(x: lookOffset.width * 0.4, y: floatPhase ? -4 : 3)
                 }
-                .scaleEffect(logoScale)
-                .opacity(logoOpacity)
-
-                // Brand Typography & OS Tag
-                VStack(spacing: 12) {
-                    Text("GISMO")
-                        .font(.system(size: 42, weight: .black, design: .rounded))
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [.white, Color.gAccent2, Color.gAccent],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .tracking(10)
-                        .shadow(color: Color.gAccent.opacity(0.35), radius: 14, x: 0, y: 4)
-
-                    HStack(spacing: 8) {
-                        Circle()
-                            .fill(Color.gSuccess)
-                            .frame(width: 6, height: 6)
-                            .shadow(color: Color.gSuccess, radius: 4)
-
-                        Text("AUTONOMOUS COMPANION OS")
-                            .font(.system(size: 11, weight: .bold, design: .monospaced))
-                            .foregroundColor(.gSubtext)
-                            .tracking(2.2)
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 6)
-                    .background(
-                        Capsule()
-                            .fill(Color.white.opacity(0.05))
-                            .overlay(
-                                Capsule()
-                                    .stroke(Color.white.opacity(0.10), lineWidth: 1)
-                            )
-                    )
-                }
-                .opacity(textOpacity)
-
-                Spacer()
-
-                // Bottom Telemetry Boot Progress
-                VStack(spacing: 10) {
-                    ZStack(alignment: .leading) {
-                        Capsule()
-                            .fill(Color.white.opacity(0.08))
-                            .frame(width: 190, height: 5)
-
-                        Capsule()
-                            .fill(LinearGradient.cyberCyan)
-                            .frame(width: 190 * bootProgress, height: 5)
-                            .shadow(color: Color.gAccent2.opacity(0.8), radius: 6)
-                    }
-
-                    Text("NÖRAL SES VE GÖRÜŞ SİSTEMLERİ HAZIRLANIYOR")
-                        .font(.system(size: 9, weight: .bold, design: .monospaced))
-                        .foregroundColor(.gSubtext.opacity(0.75))
-                        .tracking(1.4)
-                }
-                .opacity(textOpacity)
-                .padding(.bottom, 48)
+                .scaleEffect(appeared ? 1.0 : 0.82)
+                .opacity(appeared ? 1.0 : 0.0)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .onAppear { animate() }
+        .statusBarHidden(true)
+        .onAppear {
+            runFaceIntroAnimation()
+        }
     }
 
-    private var gismoEyeCapsule: some View {
-        RoundedRectangle(cornerRadius: 8, style: .continuous)
+    @ViewBuilder
+    private func splashEye(width: CGFloat, height: CGFloat) -> some View {
+        let currentPrimary   = isSmiling ? primaryColor : secondaryColor
+        let currentSecondary = isSmiling ? Color(hex: "55E6C1") : Color(hex: "A7F3FF")
+        let actualHeight     = isBlinking ? max(8, height * 0.08) : height
+
+        RoundedRectangle(cornerRadius: actualHeight * 0.48, style: .continuous)
             .fill(
                 LinearGradient(
-                    colors: [Color.gCyan, Color.gAccent2],
-                    startPoint: .top,
-                    endPoint: .bottom
+                    colors: [currentPrimary, currentSecondary],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
                 )
             )
-            .frame(width: 24, height: eyeBlink ? 3 : 30)
-            .shadow(color: Color.gCyan.opacity(0.85), radius: 8)
-            .overlay(
-                Circle()
-                    .fill(Color.white.opacity(eyeBlink ? 0 : 0.85))
-                    .frame(width: 6, height: 6)
-                    .offset(x: -4, y: -6)
-            )
+            .frame(width: width, height: actualHeight)
+            .shadow(color: currentPrimary.opacity(0.85), radius: 24, x: 0, y: 0)
+            .overlay(alignment: .topLeading) {
+                if !isBlinking {
+                    Capsule()
+                        .fill(Color.white.opacity(0.68))
+                        .frame(width: width * 0.22, height: max(5, height * 0.13))
+                        .offset(x: width * 0.18, y: height * 0.18)
+                }
+            }
     }
 
-    private func animate() {
-        withAnimation(.spring(response: 0.65, dampingFraction: 0.68).delay(0.08)) {
-            logoScale = 1.0
-            logoOpacity = 1.0
+    private func runFaceIntroAnimation() {
+        // 1. Yüz ekranda belirir ve gözlerini açar (uyanma)
+        withAnimation(.spring(response: 0.55, dampingFraction: 0.72)) {
+            appeared = true
         }
-        withAnimation(.easeOut(duration: 0.9).delay(0.2)) {
-            glowRadius = 32
+        withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true)) {
+            floatPhase = true
+            auraPulse = true
         }
-        withAnimation(.easeOut(duration: 0.7).delay(0.28)) {
-            textOpacity = 1.0
-        }
-        withAnimation(.spring(response: 1.1, dampingFraction: 0.75).delay(0.18)) {
-            ringScale = 1.0
-            ringOpacity = 1.0
-        }
-        withAnimation(.linear(duration: 14).repeatForever(autoreverses: false)) {
-            orbitRotation = 360
-        }
-        withAnimation(.easeInOut(duration: 2.1).delay(0.2)) {
-            bootProgress = 1.0
-        }
-        // Friendly double blink during splash
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.95) {
-            withAnimation(.easeInOut(duration: 0.10)) { eyeBlink = true }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.13) {
-                withAnimation(.easeInOut(duration: 0.12)) { eyeBlink = false }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.68)) {
+                isBlinking = false
             }
         }
+
+        // 2. Meraklı bir şekilde hafif sola ve sağa bakış
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.55) {
+            withAnimation(.spring(response: 0.38, dampingFraction: 0.75)) {
+                lookOffset = CGSize(width: -12, height: -4)
+            }
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.95) {
+            withAnimation(.spring(response: 0.38, dampingFraction: 0.75)) {
+                lookOffset = CGSize(width: 10, height: -2)
+            }
+        }
+
+        // 3. Merkeze dönüp çift göz kırpma ve mutlu gülümseme
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.30) {
+            withAnimation(.spring(response: 0.32, dampingFraction: 0.78)) {
+                lookOffset = .zero
+            }
+            withAnimation(.easeInOut(duration: 0.07)) {
+                isBlinking = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.09) {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.68)) {
+                    isBlinking = false
+                    isSmiling = true
+                }
+            }
+        }
+    }
+}
+
+private struct SplashSmileShape: Shape {
+    let depth: CGFloat
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX, y: rect.midY - depth * 0.15))
+        path.addQuadCurve(
+            to: CGPoint(x: rect.maxX, y: rect.midY - depth * 0.15),
+            control: CGPoint(x: rect.midX, y: rect.midY + depth)
+        )
+        return path
     }
 }
 
