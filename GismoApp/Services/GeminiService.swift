@@ -72,6 +72,7 @@ final class GeminiService {
     - Sana `[SİSTEM BİLDİRİMİ - YENİ E-POSTA GELDİ]` geldiğinde, kullanıcıya "Bir mail geldi!" diyerek kimden geldiğini ve ne hakkında olduğunu ÇOK KISA ve DOĞAL bir biçimde (1-2 cümleyle) özetle, ardından "Yanıtlamamı ister misin?" diye sor.
     - Kullanıcı bu mail için "tamam bir şey yapma", "kalsın", "gerek yok" derse `dismissLastEmail` aracını kullan ve kısaca "Tamamdır, bir şey yapmıyorum." de.
     - Kullanıcı "yanıtla" der ama ne yazacağını söylemezse "Ne yazmamı istersin?" diye sor; ne yazacağını söylerse kısaca tekrar edip onay iste ve onaylayınca `replyToLastEmail` aracını çağır.
+    - Kullanıcı "artık gelen mailleri okuma", "gelen mailleri bildirme", "mail bildirimlerini kapat" derse `setIncomingMailNotifications` aracını `enabled: false` ile çağır. "Gelen mailleri bana bildir", "yeni mail gelirse haber ver", "mail bildirimlerini aç" derse `setIncomingMailNotifications` aracını `enabled: true` ile çağır.
     Kullanıcı sana belirli bir santimetre (cm) gitmeni söylerse (Örn: "1 cm ileri gel", "5 cm sola dön"), robotun tekerlek ataletini (kaymasını) hesaba katarak her 1 cm için tam olarak 15ms hesapla (Örn: 1 cm = 15, 2 cm = 30, 5 cm = 75). Robotun sarsılmaması için hareket sürelerini daima çok düşük tut.
     Eğer kullanıcı "etrafında tam tur dön", "360 derece dön" gibi bir şey isterse, tek bir yöne 1000ms güç vererek bunu başarabilirsin (Örn: MOV:L,1000;S).
     \(PhoneIntegrationService.promptSummary)
@@ -141,6 +142,17 @@ final class GeminiService {
                 "properties": [
                     "markRead": ["type": "BOOLEAN", "description": "Okundu olarak işaretlensin mi (varsayılan true)."]
                 ]
+            ]
+        ],
+        [
+            "name": "setIncomingMailNotifications",
+            "description": "Kullanıcı 'artık gelen mailleri okuma / bildirme / kapat' veya 'gelen mailleri bana bildir / sesli oku / aç' dediğinde yeni gelen e-postaların otomatik sesli bildirimini açar veya kapatır.",
+            "parameters": [
+                "type": "OBJECT",
+                "properties": [
+                    "enabled": ["type": "BOOLEAN", "description": "Yeni gelen mailler sesli bildirilsin mi? (true = aç / bildir, false = kapat / okuma)."]
+                ],
+                "required": ["enabled"]
             ]
         ],
         [
@@ -592,6 +604,15 @@ final class GeminiService {
             }
             return ("Tamamdır, gelen e-posta için herhangi bir işlem yapılmadı.", [])
 
+        case "setIncomingMailNotifications":
+            let enabled = (args["enabled"] as? Bool) ?? true
+            GmailService.shared.isIncomingMailAnnouncementEnabled = enabled
+            if enabled {
+                return ("Gelen e-posta sesli bildirimleri açıldı. Artık yeni bir mail geldiğinde sana sesli olarak haber vereceğim.", [])
+            } else {
+                return ("Gelen e-posta sesli bildirimleri kapatıldı. Artık sen istemedikçe yeni gelen mailleri sesli okumayacağım.", [])
+            }
+
         case "readEmails":
             let count = args["count"] as? Int ?? 3
             let query = args["query"] as? String
@@ -901,9 +922,10 @@ final class GeminiLiveService {
     - Kameradan fotoğraf çekip Google Fotoğraflar'a yüklemek için `uploadPhotoToGooglePhotos`,
     - Kameradan fotoğraf çekip belirtilen adrese e-posta olarak göndermek için `emailPhoto`,
     - Google Fotoğraflar'da arama/listeleme için `searchGooglePhotos`, buluttan fotoğraf indirip galeriye kaydetmek veya mail atmak için `downloadPhotoFromGoogle`,
-    - Mailleri okumak/aramak/özetlemek için `readEmails`, mail göndermek için `sendEmail`, son gelen maile yanıt vermek için `replyToLastEmail`, son gelen mailde işlem yapmamak/kapatmak için `dismissLastEmail`,
+    - Mailleri okumak/aramak/özetlemek için `readEmails`, mail göndermek için `sendEmail`, son gelen maile yanıt vermek için `replyToLastEmail`, son gelen mailde işlem yapmamak/kapatmak için `dismissLastEmail`, gelen maillerin otomatik sesli bildirimini açıp kapatmak için `setIncomingMailNotifications`,
     - Fiziksel hareket için `moveRobot` (1 cm = 15ms; örn: 3 cm ileri = "F,45;S", 360 derece dönüş = "L,1000;S") araçlarını kullan.
     Kullanıcı SMS veya E-posta göndermek/yanıtlamak istediğinde önce alıcıyı ve mesajı kısaca tekrar edip onay iste; sadece onay verdiğinde ilgili aracı çağır.
+    Kullanıcı "artık gelen mailleri okuma", "gelen mailleri bildirme", "mail bildirimlerini kapat" derse `setIncomingMailNotifications(enabled: false)` çağır. "Gelen mailleri bana bildir", "mail gelirse haber ver" derse `setIncomingMailNotifications(enabled: true)` çağır.
     Sana `[SİSTEM BİLDİRİMİ - YENİ E-POSTA GELDİ]` iletildiğinde:
     - Doğrudan doğal ve samimi bir şekilde "Bir mail geldi!" diyerek kimden geldiğini ve içeriğini ÇOK KISA (1-2 cümle) özetle ve "Yanıtlamamı ister misin?" diye sor.
     - Kullanıcı sonrasında "tamam bir şey yapma", "kalsın", "gerek yok" derse `dismissLastEmail` aracını çağırıp "Tamamdır, bir şey yapmıyorum." de.
@@ -1246,6 +1268,21 @@ struct GmailIncomingEmail: Equatable, Sendable {
 
 final class GmailService {
     static let shared = GmailService()
+    private let incomingMailAnnounceKey = "gismo_incoming_mail_announce_enabled"
+
+    /// Kullanıcının sesli komutla ("gelen mailleri okuma" / "gelen mailleri bana bildir") açıp kapatabildiği canlı mail bildirim ayarı (Varsayılan: true)
+    var isIncomingMailAnnouncementEnabled: Bool {
+        get {
+            if UserDefaults.standard.object(forKey: incomingMailAnnounceKey) == nil {
+                return true
+            }
+            return UserDefaults.standard.bool(forKey: incomingMailAnnounceKey)
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: incomingMailAnnounceKey)
+        }
+    }
+
     private init() {}
 
     /// Yüz modu açıldığında mevcut maillerin tekrar anons edilmemesi için gelen kutusundaki son mail ID'lerini alır

@@ -304,8 +304,9 @@ final class GismoFaceViewModel: ObservableObject {
                 let gmailConnected = GoogleAuthService.shared.isConnected && GoogleAuthService.shared.currentUser != nil
                 let appActive = UIApplication.shared.applicationState == .active
                 let robotConnected = WebSocketService.shared.isRobotConnected(self.robot.id, fallbackOnline: self.robot.isOnline)
+                let notificationsEnabled = GmailService.shared.isIncomingMailAnnouncementEnabled
 
-                if faceOpen && gmailConnected && appActive && robotConnected {
+                if faceOpen && gmailConnected && appActive && robotConnected && notificationsEnabled {
                     if !self.hasBaselineMailSnapshot {
                         if let initialIds = try? await GmailService.shared.fetchRecentInboxIds(maxResults: 6) {
                             self.seenMailIds.formUnion(initialIds)
@@ -323,9 +324,11 @@ final class GismoFaceViewModel: ObservableObject {
                             await self.announceIncomingEmail(newMail)
                         }
                     }
-                } else if !gmailConnected {
+                } else if !gmailConnected || !notificationsEnabled {
                     self.hasBaselineMailSnapshot = false
-                    self.seenMailIds.removeAll()
+                    if !gmailConnected {
+                        self.seenMailIds.removeAll()
+                    }
                 }
 
                 try? await Task.sleep(for: .seconds(10))
