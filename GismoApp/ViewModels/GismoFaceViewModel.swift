@@ -284,7 +284,7 @@ final class GismoFaceViewModel: ObservableObject {
     // MARK: - Canlı Gelen E-posta İzleme ve Sesli Özetleme
 
     /// Koşullar:
-    /// 1) Yüz AI modu açık (`isFaceModeActive` & `AIKeyStore.hasValidKey`)
+    /// 1) Yüz AI modu açık (`isFaceModeActive` & `AIKeyStore.hasKey`)
     /// 2) Gmail hesabı bağlı (`GoogleAuthService.shared.isConnected`)
     /// 3) Uygulama ön planda çalışır durumda ve robota bağlı (`UIApplication.shared.applicationState == .active` & `WebSocketService.shared.isRobotConnected`)
     private func startIncomingMailMonitor() {
@@ -300,7 +300,7 @@ final class GismoFaceViewModel: ObservableObject {
             while !Task.isCancelled {
                 guard let self else { return }
 
-                let faceOpen = self.isFaceModeActive && AIKeyStore.hasValidKey
+                let faceOpen = self.isFaceModeActive && AIKeyStore.hasKey
                 let gmailConnected = GoogleAuthService.shared.isConnected && GoogleAuthService.shared.currentUser != nil
                 let appActive = UIApplication.shared.applicationState == .active
                 let robotConnected = WebSocketService.shared.isRobotConnected(self.robot.id, fallbackOnline: self.robot.isOnline)
