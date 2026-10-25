@@ -10,6 +10,8 @@ struct RobotListView: View {
     @State private var robotPendingModeSelection: Robot?
     @State private var selectedFaceRobot: Robot?
     @State private var showIntegrations = false
+    @State private var robotAwaitingAIKey: Robot?
+    @AppStorage(AIKeyStore.storageKey) private var aiKey: String = ""
 
     // Test Mode Properties
     @State private var logoTapCount = 0
@@ -55,6 +57,11 @@ struct RobotListView: View {
         }
         .fullScreenCover(item: $selectedFaceRobot) { robot in
             GismoFaceView(robot: robot)
+        }
+        .sheet(item: $robotAwaitingAIKey) { robot in
+            AIKeySheet(isGate: true) {
+                selectedFaceRobot = robot
+            }
         }
         .sheet(isPresented: $showIntegrations) {
             IntegrationsView()
@@ -329,6 +336,15 @@ struct RobotListView: View {
         }
     }
 
+    /// Yüz / yapay zeka modu yalnızca Yapay Zeka Anahtarı girilmişse açılır
+    private func openFaceMode(_ robot: Robot) {
+        if aiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            robotAwaitingAIKey = robot
+        } else {
+            selectedFaceRobot = robot
+        }
+    }
+
     private var robotListContent: some View {
         List {
             if let errorMessage = viewModel.errorMessage {
@@ -343,7 +359,7 @@ struct RobotListView: View {
                     robot: robot,
                     isInteractive: robot.isOnline || isTestModeEnabled,
                     onSelectFace: {
-                        selectedFaceRobot = robot
+                        openFaceMode(robot)
                     },
                     onSelectControl: {
                         selectedRobot = robot
@@ -452,11 +468,11 @@ struct RobotListView: View {
                         title: "Gismo AI Yüz & Sesli Asistan",
                         subtitle: "Canlı konuşma, yüz takibi, kamera ve Google asistanı",
                         icon: "sparkles",
-                        badge: "ÖNERİLEN",
+                        badge: aiKey.trimmingCharacters(in: .whitespaces).isEmpty ? "ANAHTAR GEREKLİ" : "ÖNERİLEN",
                         tint: .gSuccess
                     ) {
                         dismissModeSelection()
-                        selectedFaceRobot = robot
+                        openFaceMode(robot)
                     }
 
                     modeOptionButton(

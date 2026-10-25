@@ -9,6 +9,7 @@ struct ControlView: View {
     @State private var commandPulse = false
     @State private var showAPModeConfirmation = false
     @State private var showFaceMode = false
+    @State private var showAIKeyGate = false
 
     init(robot: Robot) {
         self.robot = robot
@@ -45,6 +46,9 @@ struct ControlView: View {
         }
         .fullScreenCover(isPresented: $showFaceMode) {
             GismoFaceView(robot: robot)
+        }
+        .sheet(isPresented: $showAIKeyGate) {
+            AIKeySheet(isGate: true) { showFaceMode = true }
         }
         .onAppear {
             withAnimation(.spring(response: 0.5, dampingFraction: 0.8).delay(0.08)) {
@@ -96,7 +100,8 @@ struct ControlView: View {
 
             // Quick switch to Gismo AI Face Mode
             Button {
-                showFaceMode = true
+                // Yüz modu yalnızca Yapay Zeka Anahtarı girilmişse açılır
+                if AIKeyStore.hasKey { showFaceMode = true } else { showAIKeyGate = true }
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: "sparkles")

@@ -25,12 +25,8 @@ enum GismoEmotionName: String {
 
 final class GeminiService {
 
-    // TODO: Production'da bu anahtarı backend proxy üzerinden kullan
-    private let defaultApiKey = "AIzaSyCdkwAmuK8i35a2iOpmphA-_kr6bMgUTvk"
-    var apiKey: String {
-        let custom = UserDefaults.standard.string(forKey: "customGeminiApiKey")?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        return custom.isEmpty ? defaultApiKey : custom
-    }
+    /// Kullanıcının Entegrasyonlar'dan girdiği Yapay Zeka Anahtarı (yüz modu bu anahtar olmadan açılmaz)
+    var apiKey: String { AIKeyStore.key }
     private let endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
     private let fallbackEndpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
     private let ttsEndpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent"

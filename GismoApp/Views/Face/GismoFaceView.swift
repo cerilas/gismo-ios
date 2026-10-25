@@ -144,6 +144,7 @@ enum GismoEmotion: CaseIterable, Identifiable {
 struct GismoFaceView: View {
     @StateObject private var vm: GismoFaceViewModel
     @Environment(\.dismiss) private var dismiss
+    @AppStorage(AIKeyStore.storageKey) private var aiKey: String = ""
     @State private var pulse = false
     @State private var blink = false
     @State private var floatPhase = false
@@ -488,11 +489,20 @@ struct GismoFaceView: View {
             }
         }
         .onAppear {
+            guard !aiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                dismiss()
+                return
+            }
             AppOrientation.lock([.landscapeLeft, .landscapeRight])
             pulse = true
             floatPhase = true
             blinkTask = scheduleBlink()
             vm.onAppear()
+        }
+        .onChange(of: aiKey) { newValue in
+            if newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                dismiss()
+            }
         }
         .onDisappear {
             AppOrientation.lock(.portrait)
@@ -1238,9 +1248,8 @@ struct IntegrationsView: View {
     @State private var showSMSInfo = false
     @State private var showSMSLogin = false
 
-    @AppStorage("customGeminiApiKey") private var customGeminiApiKey: String = ""
+    @AppStorage(AIKeyStore.storageKey) private var customGeminiApiKey: String = ""
     @State private var showGeminiKeyPrompt = false
-    @State private var geminiKeyInput = ""
     
     var body: some View {
         NavigationView {
@@ -1495,9 +1504,8 @@ struct IntegrationsView: View {
                         )
                         .padding(.horizontal, 20)
 
-                        // Gemini API Anahtarı & Ses Motoru Card
+                        // Yapay Zeka Anahtarı Card (yüz modu için zorunlu)
                         Button {
-                            geminiKeyInput = customGeminiApiKey
                             showGeminiKeyPrompt = true
                         } label: {
                             HStack(spacing: 14) {
@@ -1515,10 +1523,10 @@ struct IntegrationsView: View {
                                 }
 
                                 VStack(alignment: .leading, spacing: 3) {
-                                    Text(customGeminiApiKey.isEmpty ? "Gemini Live AI Anahtarı" : "Özel Gemini Anahtarı Aktif")
+                                    Text(customGeminiApiKey.isEmpty ? "Yapay Zeka Anahtarı" : "Yapay Zeka Anahtarı Aktif")
                                         .font(.system(size: 15, weight: .bold, design: .rounded))
                                         .foregroundColor(.white)
-                                    Text("24kHz Native Audio • Özel API anahtarı girmek için dokun")
+                                    Text(customGeminiApiKey.isEmpty ? "Yüz modu için gerekli • Girmek için dokun" : "Yüz modu kullanıma hazır • •••• \(String(customGeminiApiKey.suffix(4)))")
                                         .font(.system(size: 12, weight: .medium))
                                         .foregroundColor(.gSubtext)
                                 }
@@ -1539,17 +1547,8 @@ struct IntegrationsView: View {
             }
             .navigationTitle("Entegrasyonlar")
             .navigationBarTitleDisplayMode(.inline)
-            .alert("Gemini API Anahtarı", isPresented: $showGeminiKeyPrompt) {
-                TextField("AIzaSy...", text: $geminiKeyInput)
-                Button("Varsayılana Dön", role: .destructive) {
-                    customGeminiApiKey = ""
-                }
-                Button("İptal", role: .cancel) {}
-                Button("Kaydet") {
-                    customGeminiApiKey = geminiKeyInput.trimmingCharacters(in: .whitespacesAndNewlines)
-                }
-            } message: {
-                Text("Google AI Studio (aistudio.google.com) üzerinden aldığınız Gemini API anahtarını girin.")
+            .sheet(isPresented: $showGeminiKeyPrompt) {
+                AIKeySheet()
             }
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {

@@ -579,7 +579,7 @@ final class GismoFaceViewModel: ObservableObject {
         } else if lower.contains("kız") || lower.contains("sinir") {
             return GeminiMessage(text: "Hey! Beni kızdırma, yoksa devrelerim ısınır!", emotion: .angry, duration: 4.5, motorSequence: [])
         } else {
-            return GeminiMessage(text: "Seni duydum! Yapay zeka bağlantım için Entegrasyonlar menüsünden yeni bir Gemini anahtarı girebilirsin.", emotion: .happy, duration: 5.0, motorSequence: [])
+            return GeminiMessage(text: "Seni duydum! Yapay zeka bağlantım için Entegrasyonlar menüsünden Yapay Zeka Anahtarını kontrol edebilirsin.", emotion: .happy, duration: 5.0, motorSequence: [])
         }
     }
 
