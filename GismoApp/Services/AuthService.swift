@@ -346,14 +346,24 @@ final class AuthService: ObservableObject {
         errorMessage = nil
         defer { isLoading = false }
 
-        let credential: ASAuthorizationAppleIDCredential = try await withCheckedThrowingContinuation { continuation in
-            let coordinator = AppleSignInCoordinator { result in
-                continuation.resume(with: result)
+        let credential: ASAuthorizationAppleIDCredential
+        do {
+            credential = try await withCheckedThrowingContinuation { continuation in
+                let coordinator = AppleSignInCoordinator { result in
+                    continuation.resume(with: result)
+                }
+                self.appleSignInCoordinator = coordinator
+                coordinator.startSignInWithAppleFlow()
             }
-            self.appleSignInCoordinator = coordinator
-            coordinator.startSignInWithAppleFlow()
+            self.appleSignInCoordinator = nil
+        } catch {
+            self.appleSignInCoordinator = nil
+            if let authErr = error as? ASAuthorizationError, authErr.code == .canceled {
+                throw error
+            }
+            self.errorMessage = "Apple ile giriş başlatılamadı. Cihazınızda Apple ID (iCloud) oturumunun açık olduğundan emin olun."
+            throw error
         }
-        self.appleSignInCoordinator = nil
 
         let appleUserId = credential.user
         let identityTokenString = credential.identityToken.flatMap { String(data: $0, encoding: .utf8) } ?? ""
