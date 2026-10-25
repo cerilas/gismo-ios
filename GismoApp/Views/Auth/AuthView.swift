@@ -47,28 +47,32 @@ struct AuthView: View {
     var body: some View {
         ZStack {
             GismoBackground()
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    dismissKeyboard()
+                }
 
             ScrollView(showsIndicators: false) {
-                VStack(spacing: 22) {
+                VStack(spacing: 12) {
                     // MARK: - Brand Header
                     brandHeader
-                        .padding(.top, 24)
+                        .padding(.top, 8)
 
                     // MARK: - Main Card
-                    VStack(spacing: 20) {
+                    VStack(spacing: 13) {
                         // Social Sign-In Buttons (Apple & Google)
-                        VStack(spacing: 10) {
+                        VStack(spacing: 8) {
                             appleAuthButton
                             googleAuthButton
                         }
 
                         // Divider
-                        HStack(spacing: 12) {
+                        HStack(spacing: 10) {
                             Rectangle()
                                 .fill(Color.gBorder)
                                 .frame(height: 1)
                             Text("VEYA")
-                                .font(.system(size: 11, weight: .bold, design: .rounded))
+                                .font(.system(size: 10, weight: .bold, design: .rounded))
                                 .tracking(1.4)
                                 .foregroundColor(.gSubtext)
                             Rectangle()
@@ -93,29 +97,47 @@ struct AuthView: View {
                             registerSection
                         }
                     }
-                    .padding(22)
+                    .padding(16)
                     .background(
-                        RoundedRectangle(cornerRadius: 26, style: .continuous)
+                        RoundedRectangle(cornerRadius: 24, style: .continuous)
                             .fill(Color.gSurface.opacity(0.92))
                             .overlay(
-                                RoundedRectangle(cornerRadius: 26, style: .continuous)
+                                RoundedRectangle(cornerRadius: 24, style: .continuous)
                                     .stroke(Color.gBorder, lineWidth: 1)
                             )
-                            .shadow(color: Color.black.opacity(0.45), radius: 24, x: 0, y: 12)
+                            .shadow(color: Color.black.opacity(0.45), radius: 20, x: 0, y: 10)
+                            .onTapGesture {
+                                dismissKeyboard()
+                            }
                     )
-                    .padding(.horizontal, 20)
+                    .padding(.horizontal, 18)
 
                     // Footer note
                     HStack(spacing: 6) {
                         Image(systemName: "checkmark.shield.fill")
-                            .font(.system(size: 12))
+                            .font(.system(size: 11))
                             .foregroundColor(.gCyan)
                         Text("Cerilas SMS Doğrulama & Güvenli Bulut Hesabı")
-                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                            .font(.system(size: 11, weight: .medium, design: .rounded))
                             .foregroundColor(.gSubtext)
                     }
-                    .padding(.bottom, 32)
+                    .padding(.bottom, 12)
                 }
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    dismissKeyboard()
+                }
+            }
+            .scrollDismissesKeyboard(.immediately)
+        }
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("Kapat") {
+                    dismissKeyboard()
+                }
+                .font(.system(size: 14, weight: .bold, design: .rounded))
+                .foregroundColor(.gCyan)
             }
         }
         .onReceive(countdownTimer) { _ in
@@ -128,20 +150,20 @@ struct AuthView: View {
     // MARK: - Brand Header
 
     private var brandHeader: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 6) {
             ZStack {
                 Circle()
                     .fill(
                         RadialGradient(
                             colors: [Color.gAccent.opacity(0.32), Color.clear],
                             center: .center,
-                            startRadius: 8,
-                            endRadius: 56
+                            startRadius: 6,
+                            endRadius: 38
                         )
                     )
-                    .frame(width: 110, height: 110)
+                    .frame(width: 72, height: 72)
 
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .fill(
                         LinearGradient(
                             colors: [Color.gSurface2, Color.gSurface],
@@ -149,26 +171,26 @@ struct AuthView: View {
                             endPoint: .bottomTrailing
                         )
                     )
-                    .frame(width: 72, height: 72)
+                    .frame(width: 54, height: 54)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 22, style: .continuous)
-                            .stroke(LinearGradient.accent, lineWidth: 1.8)
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .stroke(LinearGradient.accent, lineWidth: 1.6)
                     )
-                    .shadow(color: Color.gAccent.opacity(0.35), radius: 14, x: 0, y: 6)
+                    .shadow(color: Color.gAccent.opacity(0.35), radius: 10, x: 0, y: 4)
 
-                HStack(spacing: 9) {
-                    RoundedRectangle(cornerRadius: 4)
+                HStack(spacing: 7) {
+                    RoundedRectangle(cornerRadius: 3.5)
                         .fill(Color.gCyan)
-                        .frame(width: 11, height: 18)
-                    RoundedRectangle(cornerRadius: 4)
+                        .frame(width: 9, height: 14)
+                    RoundedRectangle(cornerRadius: 3.5)
                         .fill(Color.gCyan)
-                        .frame(width: 11, height: 18)
+                        .frame(width: 9, height: 14)
                 }
-                .shadow(color: Color.gCyan.opacity(0.9), radius: 6)
+                .shadow(color: Color.gCyan.opacity(0.9), radius: 5)
             }
 
             Text("Devam etmek için giriş yapın veya hesap oluşturun")
-                .font(.system(size: 13, weight: .medium, design: .rounded))
+                .font(.system(size: 12, weight: .medium, design: .rounded))
                 .foregroundColor(.gSubtext)
                 .multilineTextAlignment(.center)
         }
@@ -178,38 +200,39 @@ struct AuthView: View {
 
     private var appleAuthButton: some View {
         Button {
+            dismissKeyboard()
             clearMessages()
             Task {
                 try? await auth.signInWithApple()
             }
         } label: {
-            HStack(spacing: 12) {
+            HStack(spacing: 10) {
                 ZStack {
                     Circle()
                         .fill(Color.white)
-                        .frame(width: 28, height: 28)
+                        .frame(width: 24, height: 24)
                     Image(systemName: "apple.logo")
-                        .font(.system(size: 15, weight: .bold))
+                        .font(.system(size: 13, weight: .bold))
                         .foregroundColor(.black)
                 }
 
                 Text("Apple ile Giriş Yap / Kayıt Ol")
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
 
                 Spacer()
 
                 Image(systemName: "arrow.up.right")
-                    .font(.system(size: 13, weight: .bold))
+                    .font(.system(size: 12, weight: .bold))
                     .foregroundColor(.gSubtext)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
             .background(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .fill(Color.black.opacity(0.65))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
                             .stroke(Color.white.opacity(0.22), lineWidth: 1)
                     )
             )
@@ -219,18 +242,19 @@ struct AuthView: View {
 
     private var googleAuthButton: some View {
         Button {
+            dismissKeyboard()
             clearMessages()
             Task {
                 try? await auth.signInWithGoogle()
             }
         } label: {
-            HStack(spacing: 12) {
+            HStack(spacing: 10) {
                 ZStack {
                     Circle()
                         .fill(Color.white)
-                        .frame(width: 28, height: 28)
+                        .frame(width: 24, height: 24)
                     Text("G")
-                        .font(.system(size: 16, weight: .black, design: .rounded))
+                        .font(.system(size: 14, weight: .black, design: .rounded))
                         .foregroundStyle(
                             LinearGradient(
                                 colors: [
@@ -246,22 +270,22 @@ struct AuthView: View {
                 }
 
                 Text("Google ile Giriş Yap / Kayıt Ol")
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
 
                 Spacer()
 
                 Image(systemName: "arrow.up.right")
-                    .font(.system(size: 13, weight: .bold))
+                    .font(.system(size: 12, weight: .bold))
                     .foregroundColor(.gSubtext)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
             .background(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .fill(Color.gSurface2)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
                             .stroke(Color.white.opacity(0.14), lineWidth: 1)
                     )
             )
@@ -276,18 +300,19 @@ struct AuthView: View {
             ForEach(AuthTab.allCases, id: \.self) { tab in
                 let isSelected = selectedTab == tab
                 Button {
+                    dismissKeyboard()
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                         selectedTab = tab
                         clearMessages()
                     }
                 } label: {
                     Text(tab.rawValue)
-                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
                         .foregroundColor(isSelected ? .white : .gSubtext)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 11)
+                        .padding(.vertical, 9)
                         .background(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            RoundedRectangle(cornerRadius: 11, style: .continuous)
                                 .fill(
                                     isSelected
                                         ? AnyShapeStyle(LinearGradient.accent)
@@ -299,10 +324,10 @@ struct AuthView: View {
         }
         .padding(4)
         .background(
-            RoundedRectangle(cornerRadius: 15, style: .continuous)
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(Color.gBg.opacity(0.75))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 15, style: .continuous)
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
                         .stroke(Color.gBorder, lineWidth: 1)
                 )
         )
@@ -311,12 +336,13 @@ struct AuthView: View {
     // MARK: - Login Section
 
     private var loginSection: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 11) {
             // Sub-method toggle: Şifre ile vs SMS Kodu ile
             HStack(spacing: 8) {
                 ForEach(LoginMethod.allCases, id: \.self) { method in
                     let active = loginMethod == method
                     Button {
+                        dismissKeyboard()
                         withAnimation(.easeInOut(duration: 0.2)) {
                             loginMethod = method
                             clearMessages()
@@ -324,13 +350,13 @@ struct AuthView: View {
                     } label: {
                         HStack(spacing: 6) {
                             Image(systemName: method == .password ? "key.fill" : "message.badge.filled.fill")
-                                .font(.system(size: 12, weight: .semibold))
+                                .font(.system(size: 11, weight: .semibold))
                             Text(method.rawValue)
                                 .font(.system(size: 12, weight: .bold, design: .rounded))
                         }
                         .foregroundColor(active ? .gCyan : .gSubtext)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
+                        .padding(.vertical, 7)
                         .background(
                             RoundedRectangle(cornerRadius: 10, style: .continuous)
                                 .fill(active ? Color.gCyan.opacity(0.14) : Color.gSurface2.opacity(0.5))
@@ -410,7 +436,7 @@ struct AuthView: View {
     // MARK: - Register Section (Email + Phone + Password -> Cerilas SMS OTP)
 
     private var registerSection: some View {
-        VStack(spacing: 15) {
+        VStack(spacing: 10) {
             if !regOtpSent {
                 authInputField(
                     title: "AD SOYAD",
@@ -582,32 +608,36 @@ struct AuthView: View {
         keyboardType: UIKeyboardType = .default,
         autocapitalization: TextInputAutocapitalization = .never
     ) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 4) {
             Text(title)
-                .font(.system(size: 10, weight: .bold, design: .rounded))
-                .tracking(0.8)
+                .font(.system(size: 9.5, weight: .bold, design: .rounded))
+                .tracking(0.7)
                 .foregroundColor(.gSubtext)
 
             HStack(spacing: 10) {
                 Image(systemName: icon)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.gAccent2)
-                    .frame(width: 22)
+                    .frame(width: 20)
 
                 TextField(placeholder, text: text)
                     .keyboardType(keyboardType)
                     .textInputAutocapitalization(autocapitalization)
                     .autocorrectionDisabled(true)
-                    .font(.system(size: 15, weight: .medium, design: .rounded))
+                    .submitLabel(.done)
+                    .onSubmit {
+                        dismissKeyboard()
+                    }
+                    .font(.system(size: 14, weight: .medium, design: .rounded))
                     .foregroundColor(.white)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 13)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
             .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                RoundedRectangle(cornerRadius: 13, style: .continuous)
                     .fill(Color.gBg.opacity(0.85))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        RoundedRectangle(cornerRadius: 13, style: .continuous)
                             .stroke(Color.gBorder, lineWidth: 1)
                     )
             )
@@ -620,46 +650,54 @@ struct AuthView: View {
         text: Binding<String>,
         isVisible: Binding<Bool>
     ) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 4) {
             Text(title)
-                .font(.system(size: 10, weight: .bold, design: .rounded))
-                .tracking(0.8)
+                .font(.system(size: 9.5, weight: .bold, design: .rounded))
+                .tracking(0.7)
                 .foregroundColor(.gSubtext)
 
             HStack(spacing: 10) {
                 Image(systemName: "lock.fill")
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.gAccent2)
-                    .frame(width: 22)
+                    .frame(width: 20)
 
                 Group {
                     if isVisible.wrappedValue {
                         TextField(placeholder, text: text)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled(true)
+                            .submitLabel(.done)
+                            .onSubmit {
+                                dismissKeyboard()
+                            }
                     } else {
                         SecureField(placeholder, text: text)
                             .textInputAutocapitalization(.never)
+                            .submitLabel(.done)
+                            .onSubmit {
+                                dismissKeyboard()
+                            }
                     }
                 }
-                .font(.system(size: 15, weight: .medium, design: .rounded))
+                .font(.system(size: 14, weight: .medium, design: .rounded))
                 .foregroundColor(.white)
 
                 Button {
                     isVisible.wrappedValue.toggle()
                 } label: {
                     Image(systemName: isVisible.wrappedValue ? "eye.slash.fill" : "eye.fill")
-                        .font(.system(size: 14))
+                        .font(.system(size: 13))
                         .foregroundColor(.gSubtext)
                 }
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 13)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
             .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                RoundedRectangle(cornerRadius: 13, style: .continuous)
                     .fill(Color.gBg.opacity(0.85))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        RoundedRectangle(cornerRadius: 13, style: .continuous)
                             .stroke(Color.gBorder, lineWidth: 1)
                     )
             )
@@ -671,25 +709,28 @@ struct AuthView: View {
         icon: String,
         action: @escaping () -> Void
     ) -> some View {
-        Button(action: action) {
-            HStack(spacing: 10) {
+        Button {
+            dismissKeyboard()
+            action()
+        } label: {
+            HStack(spacing: 8) {
                 if auth.isLoading {
                     ProgressView()
                         .tint(.white)
                 } else {
                     Image(systemName: icon)
-                        .font(.system(size: 15, weight: .bold))
+                        .font(.system(size: 14, weight: .bold))
                     Text(title)
-                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .font(.system(size: 14, weight: .bold, design: .rounded))
                 }
             }
             .foregroundColor(.white)
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 15)
+            .padding(.vertical, 12)
             .background(
-                RoundedRectangle(cornerRadius: 15, style: .continuous)
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .fill(LinearGradient.accent)
-                    .shadow(color: Color.gAccent.opacity(0.4), radius: 12, x: 0, y: 6)
+                    .shadow(color: Color.gAccent.opacity(0.4), radius: 10, x: 0, y: 5)
             )
         }
         .disabled(auth.isLoading)
@@ -717,6 +758,10 @@ struct AuthView: View {
     }
 
     // MARK: - Actions
+
+    private func dismissKeyboard() {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+    }
 
     private func clearMessages() {
         localErrorMessage = nil
@@ -996,8 +1041,12 @@ struct RobotNamingOnboardingView: View {
     var body: some View {
         ZStack {
             GismoBackground()
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    isFocused = false
+                }
 
-            VStack(spacing: 26) {
+            VStack(spacing: 22) {
                 Spacer()
 
                 // Robot Face Emblem Only
@@ -1011,9 +1060,9 @@ struct RobotNamingOnboardingView: View {
                                 endRadius: 68
                             )
                         )
-                        .frame(width: 136, height: 136)
+                        .frame(width: 116, height: 116)
 
-                    RoundedRectangle(cornerRadius: 26, style: .continuous)
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
                         .fill(
                             LinearGradient(
                                 colors: [Color.gSurface2, Color.gSurface],
@@ -1021,28 +1070,31 @@ struct RobotNamingOnboardingView: View {
                                 endPoint: .bottomTrailing
                             )
                         )
-                        .frame(width: 88, height: 88)
+                        .frame(width: 76, height: 76)
                         .overlay(
-                            RoundedRectangle(cornerRadius: 26, style: .continuous)
+                            RoundedRectangle(cornerRadius: 24, style: .continuous)
                                 .stroke(LinearGradient.accent, lineWidth: 2)
                         )
                         .shadow(color: Color.gAccent.opacity(0.4), radius: 16, x: 0, y: 8)
 
-                    VStack(spacing: 8) {
-                        HStack(spacing: 12) {
-                            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                    VStack(spacing: 7) {
+                        HStack(spacing: 11) {
+                            RoundedRectangle(cornerRadius: 4.5, style: .continuous)
                                 .fill(Color.gCyan)
-                                .frame(width: 13, height: 20)
-                            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                .frame(width: 12, height: 18)
+                            RoundedRectangle(cornerRadius: 4.5, style: .continuous)
                                 .fill(Color.gCyan)
-                                .frame(width: 13, height: 20)
+                                .frame(width: 12, height: 18)
                         }
                         .shadow(color: Color.gCyan.opacity(0.9), radius: 7)
 
                         Capsule()
                             .fill(Color.gSuccess)
-                            .frame(width: 18, height: 3.5)
+                            .frame(width: 16, height: 3)
                     }
+                }
+                .onTapGesture {
+                    isFocused = false
                 }
 
                 VStack(spacing: 10) {

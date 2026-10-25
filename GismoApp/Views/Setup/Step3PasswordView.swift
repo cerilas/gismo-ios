@@ -167,6 +167,11 @@ struct Step3PasswordView: View {
             .padding(.bottom, 50)
             .opacity(appeared ? 1 : 0)
         }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            passwordFocused = false
+            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        }
         .onAppear {
             withAnimation(.easeOut(duration: 0.4)) { appeared = true }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
