@@ -40,6 +40,7 @@
 		A1C0FFEE0000000000000009 /* AIKeySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0FFEE000000000000000A /* AIKeySheet.swift */; };
 		A1C0FFEE000000000000000B /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0FFEE000000000000000C /* AuthService.swift */; };
 		A1C0FFEE000000000000000D /* AuthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0FFEE000000000000000E /* AuthView.swift */; };
+		A1C0FFEE0000000000000011 /* GismoMemoryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0FFEE0000000000000012 /* GismoMemoryService.swift */; };
 		E957EF1DFE1ED02C386C7245 /* RobotListViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 802A82449946EE717D78AEC4 /* RobotListViewModel.swift */; };
 		EE460D3B07F1D3FA85BCDBCC /* Step1ConnectView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 223BE30460AE695E9DC8F8D9 /* Step1ConnectView.swift */; };
 		FAC29F626FA84D908A5046A1 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 18C1BF4CA0DFCB09BEAF3570 /* Assets.xcassets */; };
@@ -72,6 +73,7 @@
 		A1C0FFEE000000000000000A /* AIKeySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIKeySheet.swift; sourceTree = "<group>"; };
 		A1C0FFEE000000000000000C /* AuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthService.swift; sourceTree = "<group>"; };
 		A1C0FFEE000000000000000E /* AuthView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthView.swift; sourceTree = "<group>"; };
+		A1C0FFEE0000000000000012 /* GismoMemoryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GismoMemoryService.swift; sourceTree = "<group>"; };
 		9D506989F006F0E05585D0A2 /* GismoCameraService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GismoCameraService.swift; sourceTree = "<group>"; };
 		A1C0FFEE0000000000000002 /* CuteRobotVoiceDSP.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CuteRobotVoiceDSP.swift; sourceTree = "<group>"; };
 		A1C0FFEE0000000000000004 /* FaceTrackingController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FaceTrackingController.swift; sourceTree = "<group>"; };
@@ -137,6 +139,7 @@
 				C430B39F51B6C1F67CCBE335 /* DatabaseService.swift */,
 				4F4666CDDFB137F6067FA30C /* ESPService.swift */,
 				292A1291A9152C8613562BEF /* GeminiService.swift */,
+				A1C0FFEE0000000000000012 /* GismoMemoryService.swift */,
 				A1C0FFEE0000000000000006 /* PhoneIntegrationService.swift */,
 				9D506989F006F0E05585D0A2 /* GismoCameraService.swift */,
 				2C5731916A2F63AB0610B699 /* GismoSoundEngine.swift */,
@@ -346,6 +349,7 @@
 				A1C0FFEE0000000000000009 /* AIKeySheet.swift in Sources */,
 				A1C0FFEE000000000000000B /* AuthService.swift in Sources */,
 				A1C0FFEE000000000000000D /* AuthView.swift in Sources */,
+				A1C0FFEE0000000000000011 /* GismoMemoryService.swift in Sources */,
 				A1C0FFEE0000000000000007 /* PhoneIntegrationsCard.swift in Sources */,
 				738BA7DBBC34BC504B9F5BD7 /* GismoFaceViewModel.swift in Sources */,
 				A1C0FFEE0000000000000003 /* FaceTrackingController.swift in Sources */,

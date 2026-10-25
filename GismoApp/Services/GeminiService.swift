@@ -43,7 +43,7 @@ final class GeminiService {
     var lastIncomingEmail: GmailIncomingEmail?
 
     private var systemPrompt: String {
-        var prompt = PhoneIntegrationService.currentDateLine() + "\n" + baseSystemPrompt
+        var prompt = PhoneIntegrationService.currentDateLine() + "\n" + baseSystemPrompt + "\n\n" + GismoMemoryService.shared.promptContext()
         if let mail = lastIncomingEmail {
             prompt += """
             
@@ -93,7 +93,7 @@ final class GeminiService {
     Tamam, 5 cm sola dönüyorum. ###EMO:happy|3.0|MOV:L,75;S###
     """
 
-    static let sharedFunctionDeclarations: [[String: Any]] = baseFunctionDeclarations + PhoneIntegrationService.functionDeclarations
+    static let sharedFunctionDeclarations: [[String: Any]] = baseFunctionDeclarations + PhoneIntegrationService.functionDeclarations + GismoMemoryService.functionDeclarations
 
     private static let baseFunctionDeclarations: [[String: Any]] = [
         [
@@ -390,7 +390,7 @@ final class GeminiService {
             let (toolResult, motorSteps) = await executeLiveTool(name: name, args: args)
 
             // Okuma/Arama araçlarında sonucu Gemini'ye özetlet (includeTools: false ile sonsuz döngüyü önle)
-            let summarizationTools: Set<String> = Set(["readEmails", "searchDrive", "readDriveFile", "searchGooglePhotos"]).union(PhoneIntegrationService.readOnlyToolNames)
+            let summarizationTools: Set<String> = Set(["readEmails", "searchDrive", "readDriveFile", "searchGooglePhotos", "recallMemories"]).union(PhoneIntegrationService.readOnlyToolNames)
             if summarizationTools.contains(name) {
                 let summaryPrompt = """
                 Kullanıcının isteği: \(userText)
@@ -810,6 +810,9 @@ final class GeminiService {
             }
 
         default:
+            if let memoryResult = GismoMemoryService.shared.executeTool(name: name, args: args) {
+                return (memoryResult, [])
+            }
             if let result = await PhoneIntegrationService.shared.execute(name: name, args: args) {
                 return (result, [])
             }
@@ -896,6 +899,7 @@ final class GeminiLiveService {
     }()
 
     private var connectedApiKey: String = ""
+    private var connectedMemoryRevision: Int = -1
     private var isConnectedAndReady: Bool = false
 
     private let candidateModels = [
@@ -905,7 +909,7 @@ final class GeminiLiveService {
     ]
 
     private var liveSystemPrompt: String {
-        PhoneIntegrationService.currentDateLine() + "\n" + baseLiveSystemPrompt + "\n" + PhoneIntegrationService.promptSummary
+        PhoneIntegrationService.currentDateLine() + "\n" + baseLiveSystemPrompt + "\n" + PhoneIntegrationService.promptSummary + "\n\n" + GismoMemoryService.shared.promptContext()
     }
 
     private let baseLiveSystemPrompt = """
@@ -950,7 +954,12 @@ final class GeminiLiveService {
     }
 
     func ensureConnected(apiKey: String) async throws {
-        if isConnectedAndReady, connectedApiKey == apiKey, let task = webSocketTask, task.state == .running {
+        let currentMemRevision = GismoMemoryService.shared.revision
+        if isConnectedAndReady,
+           connectedApiKey == apiKey,
+           connectedMemoryRevision == currentMemRevision,
+           let task = webSocketTask,
+           task.state == .running {
             return
         }
 
@@ -961,6 +970,7 @@ final class GeminiLiveService {
             do {
                 try await connectWithModel(model, apiKey: apiKey)
                 connectedApiKey = apiKey
+                connectedMemoryRevision = currentMemRevision
                 isConnectedAndReady = true
                 print("[GeminiLive] Bağlantı hazır (\(model))")
                 return

@@ -279,6 +279,9 @@ final class GismoFaceViewModel: ObservableObject {
             setupBrightnessObserver()
             isInitialized = true
         }
+        Task {
+            await GismoMemoryService.shared.syncFromServer()
+        }
         geminiLive.prewarm(apiKey: gemini.apiKey)
         setupVoice()
         vision.start() // Yüz takibini başlat
@@ -618,9 +621,13 @@ final class GismoFaceViewModel: ObservableObject {
         let isCloudSearchOrDownload = lowerText.contains("indir") || lowerText.contains("listele") || lowerText.contains("ara")
         let isPhotoCommand = !isCloudSearchOrDownload && photoKeywords.contains { lowerText.contains($0) }
 
+        var assistantReplyForMemory = ""
+
         do {
             // 1. ÖNCELİK: Gemini Live API (WebSocket Gerçek Zamanlı Native Audio — Akıcı doğal Türkçe diksiyon + anlık yanıt)
             let liveResult = try await geminiLive.sendTurn(text, using: gemini)
+            assistantReplyForMemory = liveResult.text
+            gemini.recordTurnInHistory(userText: text, modelText: liveResult.text)
             let steps = liveResult.motorSequence.isEmpty
                 ? defaultMotorSequence(for: liveResult.emotion)
                 : liveResult.motorSequence
@@ -648,6 +655,7 @@ final class GismoFaceViewModel: ObservableObject {
             do {
                 // 2. ÖNCELİK: Gemini REST + Gemini Neural TTS (Aoede)
                 let message = try await gemini.send(text, robotName: robot.name)
+                assistantReplyForMemory = message.text
                 let steps = message.motorSequence.isEmpty
                     ? defaultMotorSequence(for: message.emotion)
                     : message.motorSequence
@@ -676,6 +684,7 @@ final class GismoFaceViewModel: ObservableObject {
 
                 // 3. ÖNCELİK (Çevrimdışı / Kota Dolu): Yerel yanıt + En yüksek kaliteli Türkçe ses
                 let fallback = localFallbackMessage(for: text)
+                assistantReplyForMemory = fallback.text
                 let displayText: String
                 if UserDefaults.standard.bool(forKey: "isTestModeEnabled") {
                     displayText = "\(fallback.text)\n(\(error.localizedDescription))"
@@ -695,6 +704,17 @@ final class GismoFaceViewModel: ObservableObject {
                     motorSteps: steps
                 )
             }
+        }
+
+        // Arka planda konuşmayı analiz et (sahibi, tanışılan kişiler, konuşulan konular veya "bunu aklında tut" notlarını kalıcı hafızaya kaydet)
+        let currentKey = gemini.apiKey
+        let replySnapshot = assistantReplyForMemory
+        Task {
+            await GismoMemoryService.shared.analyzeAndMemorizeTurn(
+                userText: text,
+                assistantText: replySnapshot,
+                apiKey: currentKey
+            )
         }
 
         resetIdleTimer()
@@ -830,6 +850,8 @@ final class GismoFaceViewModel: ObservableObject {
             return GeminiMessage(text: "Hemen fotoğrafını çekiyorum, gülümse!", emotion: .veryHappy, duration: 4.5, motorSequence: [])
         } else if lower.contains("uyu") || lower.contains("iyi geceler") {
             return GeminiMessage(text: "İyi geceler, biraz şekerleme yapacağım.", emotion: .sleeping, duration: 0, motorSequence: [])
+        } else if lower.contains("aklında tut") || lower.contains("aklinda tut") || lower.contains("unutma") || lower.contains("hafızana kaydet") {
+            return GeminiMessage(text: "Tamamdır, bunu kalıcı hafızama kaydettim, hiç unutmayacağım!", emotion: .veryHappy, duration: 4.5, motorSequence: [])
         } else if lower.contains("üzgün") || lower.contains("kötü") {
             return GeminiMessage(text: "Üzülme, ben hep senin yanındayım.", emotion: .sad, duration: 4.5, motorSequence: [])
         } else if lower.contains("kız") || lower.contains("sinir") {
