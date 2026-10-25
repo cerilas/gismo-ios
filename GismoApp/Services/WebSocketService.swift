@@ -118,6 +118,19 @@ final class WebSocketService {
         cachedRobots
     }
 
+    func isRobotConnected(_ robotID: UUID, fallbackOnline: Bool) -> Bool {
+        if UserDefaults.standard.bool(forKey: "isTestModeEnabled") {
+            return true
+        }
+        guard let task, task.state == .running else {
+            return false
+        }
+        if let cached = cachedRobots.first(where: { $0.id == robotID }) {
+            return cached.isOnline
+        }
+        return fallbackOnline
+    }
+
     private func makeWebSocketURL() -> URL? {
         guard var components = URLComponents(string: Config.baseURL) else { return nil }
         components.scheme = components.scheme == "https" ? "wss" : "ws"

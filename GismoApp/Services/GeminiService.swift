@@ -39,7 +39,23 @@ final class GeminiService {
     // Konuşma geçmişi (multi-turn)
     private var history: [[String: Any]] = []
 
-    private var systemPrompt: String { PhoneIntegrationService.currentDateLine() + "\n" + baseSystemPrompt }
+    /// Yüz modu açıkken yeni gelen son e-posta (kullanıcının "yanıtla", "bir şey yapma" gibi komutları için)
+    var lastIncomingEmail: GmailIncomingEmail?
+
+    private var systemPrompt: String {
+        var prompt = PhoneIntegrationService.currentDateLine() + "\n" + baseSystemPrompt
+        if let mail = lastIncomingEmail {
+            prompt += """
+            
+            [SON GELEN AKTİF E-POSTA BİLGİSİ]
+            - Gönderen: \(mail.senderName) <\(mail.senderEmail)>
+            - Konu: \(mail.subject)
+            - İçerik Özeti: \(String(mail.bodyText.prefix(600)))
+            Kullanıcı "yanıtla", "cevap yaz" derse bu e-postayı baz al (`replyToLastEmail` aracını kullan). "Tamam bir şey yapma", "kalsın", "gerek yok" derse `dismissLastEmail` aracını çağır veya nazikçe bir şey yapmayacağını söyle.
+            """
+        }
+        return prompt
+    }
 
     private let baseSystemPrompt = """
     Sen Gismo, sevimli ve empatik bir Türkçe konuşan robot yardımcısın. Kısa yanıtlar ver (max 2 cümle).
@@ -50,8 +66,12 @@ final class GeminiService {
     Süre: saniye (0=kalıcı)
     MOV: F=İleri,B=Geri,L=Sol,R=Sağ,S=Dur — max 1.5sn toplam, S ile bitir
 
-    KABİLİYETLERİN: konuşma, robot hareketi, fotoğraf çekme, uyku modu, GMAIL (e-posta okuma, arama, özetleme, gönderme, ekli dosya gönderme), GOOGLE DRIVE (dosya arama, son dosyaları listeleme, dosya/PDF/doküman/tablo açıp okuma ve özetleme, yeni metin/not dosyası oluşturup yükleme, Drive'dan dosya alıp mail atma), GOOGLE PHOTOS (fotoğraf yükleme, fotoğrafları listeleme/arama, buluttan fotoğraf indirip galeriye kaydetme veya mail atma), SMS GÖNDERME ve REHBER SORGULAMA.
-    ÖNEMLİ GÜVENLİK KURALI: Kullanıcı SMS veya E-posta göndermek istediğinde ASLA ilgili aracı anında çalıştırma! Önce alıcıyı ve mesajı kullanıcıya tekrar et ve "Mesajı gönderiyorum, onaylıyor musun?" diye sor. SADECE kullanıcı "evet, onayla, gönder" gibi onaylayıcı bir cevap verirse `sendSMS` veya `sendEmail` aracını çalıştır.
+    KABİLİYETLERİN: konuşma, robot hareketi, fotoğraf çekme, uyku modu, GMAIL (e-posta okuma, arama, özetleme, gönderme, yeni gelen e-postayı anons edip yanıtlama, ekli dosya gönderme), GOOGLE DRIVE (dosya arama, son dosyaları listeleme, dosya/PDF/doküman/tablo açıp okuma ve özetleme, yeni metin/not dosyası oluşturup yükleme, Drive'dan dosya alıp mail atma), GOOGLE PHOTOS (fotoğraf yükleme, fotoğrafları listeleme/arama, buluttan fotoğraf indirip galeriye kaydetme veya mail atma), SMS GÖNDERME ve REHBER SORGULAMA.
+    ÖNEMLİ GÜVENLİK KURALI: Kullanıcı SMS veya E-posta göndermek/yanıtlamak istediğinde ASLA ilgili aracı anında çalıştırma! Önce alıcıyı ve mesajı kullanıcıya tekrar et ve "Mesajı gönderiyorum, onaylıyor musun?" diye sor. SADECE kullanıcı "evet, onayla, gönder" gibi onaylayıcı bir cevap verirse `sendSMS`, `sendEmail` veya `replyToLastEmail` aracını çalıştır.
+    YENİ GELEN MAİL BİLDİRİMİ KURALI:
+    - Sana `[SİSTEM BİLDİRİMİ - YENİ E-POSTA GELDİ]` geldiğinde, kullanıcıya "Bir mail geldi!" diyerek kimden geldiğini ve ne hakkında olduğunu ÇOK KISA ve DOĞAL bir biçimde (1-2 cümleyle) özetle, ardından "Yanıtlamamı ister misin?" diye sor.
+    - Kullanıcı bu mail için "tamam bir şey yapma", "kalsın", "gerek yok" derse `dismissLastEmail` aracını kullan ve kısaca "Tamamdır, bir şey yapmıyorum." de.
+    - Kullanıcı "yanıtla" der ama ne yazacağını söylemezse "Ne yazmamı istersin?" diye sor; ne yazacağını söylerse kısaca tekrar edip onay iste ve onaylayınca `replyToLastEmail` aracını çağır.
     Kullanıcı sana belirli bir santimetre (cm) gitmeni söylerse (Örn: "1 cm ileri gel", "5 cm sola dön"), robotun tekerlek ataletini (kaymasını) hesaba katarak her 1 cm için tam olarak 15ms hesapla (Örn: 1 cm = 15, 2 cm = 30, 5 cm = 75). Robotun sarsılmaması için hareket sürelerini daima çok düşük tut.
     Eğer kullanıcı "etrafında tam tur dön", "360 derece dön" gibi bir şey isterse, tek bir yöne 1000ms güç vererek bunu başarabilirsin (Örn: MOV:L,1000;S).
     \(PhoneIntegrationService.promptSummary)
@@ -100,6 +120,27 @@ final class GeminiService {
                     "body": ["type": "STRING", "description": "E-postanın içeriği."]
                 ],
                 "required": ["recipient", "subject", "body"]
+            ]
+        ],
+        [
+            "name": "replyToLastEmail",
+            "description": "Az önce gelen ve kullanıcıya özetlenen son e-postaya aynı konu/thread üzerinden yanıt gönderir.",
+            "parameters": [
+                "type": "OBJECT",
+                "properties": [
+                    "body": ["type": "STRING", "description": "Gönderilecek yanıt mesajı."]
+                ],
+                "required": ["body"]
+            ]
+        ],
+        [
+            "name": "dismissLastEmail",
+            "description": "Kullanıcı yeni gelen e-posta için 'tamam bir şey yapma', 'kalsın', 'gerek yok' dediğinde e-postayı okundu olarak işaretler ve kapatır.",
+            "parameters": [
+                "type": "OBJECT",
+                "properties": [
+                    "markRead": ["type": "BOOLEAN", "description": "Okundu olarak işaretlensin mi (varsayılan true)."]
+                ]
             ]
         ],
         [
@@ -379,6 +420,14 @@ final class GeminiService {
         history = []
     }
 
+    func recordTurnInHistory(userText: String, modelText: String) {
+        history.append(["role": "user", "parts": [["text": userText]]])
+        history.append(["role": "model", "parts": [["text": modelText]]])
+        if history.count > 20 {
+            history = Array(history.dropFirst(2))
+        }
+    }
+
     // MARK: - Gemini TTS (Natural Turkish Neural Speech Synthesis)
 
     func synthesizeSpeech(text: String, emotion: GismoEmotionName) async throws -> (data: Data, mimeType: String) {
@@ -517,6 +566,31 @@ final class GeminiService {
             } catch {
                 return ("E-posta hatası: \(error.localizedDescription)", [])
             }
+
+        case "replyToLastEmail":
+            let body = (args["body"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !body.isEmpty else {
+                return ("Yanıt metni boş olamaz.", [])
+            }
+            guard let incoming = lastIncomingEmail else {
+                return ("Yanıtlanacak son gelen bir e-posta bulunamadı.", [])
+            }
+            do {
+                let success = try await GmailService.shared.replyToEmail(incoming, body: body)
+                if success {
+                    return ("\(incoming.senderName) (\(incoming.senderEmail)) kişisine yanıtınız başarıyla gönderildi.", [])
+                }
+                return ("Yanıt gönderilemedi.", [])
+            } catch {
+                return ("Yanıt gönderme hatası: \(error.localizedDescription)", [])
+            }
+
+        case "dismissLastEmail":
+            let markRead = (args["markRead"] as? Bool) ?? true
+            if markRead, let incoming = lastIncomingEmail {
+                try? await GmailService.shared.markEmailAsRead(messageId: incoming.id)
+            }
+            return ("Tamamdır, gelen e-posta için herhangi bir işlem yapılmadı.", [])
 
         case "readEmails":
             let count = args["count"] as? Int ?? 3
@@ -827,9 +901,13 @@ final class GeminiLiveService {
     - Kameradan fotoğraf çekip Google Fotoğraflar'a yüklemek için `uploadPhotoToGooglePhotos`,
     - Kameradan fotoğraf çekip belirtilen adrese e-posta olarak göndermek için `emailPhoto`,
     - Google Fotoğraflar'da arama/listeleme için `searchGooglePhotos`, buluttan fotoğraf indirip galeriye kaydetmek veya mail atmak için `downloadPhotoFromGoogle`,
-    - Mailleri okumak/aramak/özetlemek için `readEmails`, mail göndermek için `sendEmail`,
+    - Mailleri okumak/aramak/özetlemek için `readEmails`, mail göndermek için `sendEmail`, son gelen maile yanıt vermek için `replyToLastEmail`, son gelen mailde işlem yapmamak/kapatmak için `dismissLastEmail`,
     - Fiziksel hareket için `moveRobot` (1 cm = 15ms; örn: 3 cm ileri = "F,45;S", 360 derece dönüş = "L,1000;S") araçlarını kullan.
-    Kullanıcı SMS veya E-posta göndermek istediğinde önce alıcıyı ve mesajı kısaca tekrar edip onay iste; sadece onay verdiğinde ilgili aracı çağır.
+    Kullanıcı SMS veya E-posta göndermek/yanıtlamak istediğinde önce alıcıyı ve mesajı kısaca tekrar edip onay iste; sadece onay verdiğinde ilgili aracı çağır.
+    Sana `[SİSTEM BİLDİRİMİ - YENİ E-POSTA GELDİ]` iletildiğinde:
+    - Doğrudan doğal ve samimi bir şekilde "Bir mail geldi!" diyerek kimden geldiğini ve içeriğini ÇOK KISA (1-2 cümle) özetle ve "Yanıtlamamı ister misin?" diye sor.
+    - Kullanıcı sonrasında "tamam bir şey yapma", "kalsın", "gerek yok" derse `dismissLastEmail` aracını çağırıp "Tamamdır, bir şey yapmıyorum." de.
+    - Kullanıcı "yanıtla" derse ne yazmak istediğini sor veya söylediyse onay alıp `replyToLastEmail` aracını çağır.
     """
 
     private var liveFunctionDeclarations: [[String: Any]] {
@@ -1153,9 +1231,233 @@ enum GeminiError: LocalizedError {
 }
 // MARK: - Gmail Service
 
+struct GmailIncomingEmail: Equatable, Sendable {
+    let id: String
+    let threadId: String
+    let rfcMessageId: String
+    let senderName: String
+    let senderEmail: String
+    let fromHeader: String
+    let subject: String
+    let snippet: String
+    let bodyText: String
+    let internalDateMs: Int64
+}
+
 final class GmailService {
     static let shared = GmailService()
     private init() {}
+
+    /// Yüz modu açıldığında mevcut maillerin tekrar anons edilmemesi için gelen kutusundaki son mail ID'lerini alır
+    func fetchRecentInboxIds(maxResults: Int = 5) async throws -> Set<String> {
+        guard let user = await GoogleAuthService.shared.currentUser else {
+            return []
+        }
+        let refreshedUser = try await refreshUserIfNeeded(user)
+        let token = refreshedUser.accessToken.tokenString
+
+        var urlComps = URLComponents(string: "https://gmail.googleapis.com/gmail/v1/users/me/messages")!
+        urlComps.queryItems = [
+            URLQueryItem(name: "maxResults", value: "\(maxResults)"),
+            URLQueryItem(name: "q", value: "in:inbox -from:me")
+        ]
+
+        var req = URLRequest(url: urlComps.url!)
+        req.timeoutInterval = 10.0
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: req)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            return []
+        }
+
+        struct ListRes: Decodable {
+            let messages: [MsgId]?
+            struct MsgId: Decodable { let id: String }
+        }
+        let decoded = try? JSONDecoder().decode(ListRes.self, from: data)
+        return Set((decoded?.messages ?? []).map(\.id))
+    }
+
+    /// Yüz modu açıkken yeni düşen okunmamış e-posta olup olmadığını kontrol eder
+    func checkForNewIncomingEmail(seenIds: Set<String>, sinceMs: Int64) async throws -> GmailIncomingEmail? {
+        guard let user = await GoogleAuthService.shared.currentUser else {
+            return nil
+        }
+        let refreshedUser = try await refreshUserIfNeeded(user)
+        let token = refreshedUser.accessToken.tokenString
+
+        var urlComps = URLComponents(string: "https://gmail.googleapis.com/gmail/v1/users/me/messages")!
+        urlComps.queryItems = [
+            URLQueryItem(name: "maxResults", value: "3"),
+            URLQueryItem(name: "q", value: "in:inbox is:unread -from:me")
+        ]
+
+        var req = URLRequest(url: urlComps.url!)
+        req.timeoutInterval = 10.0
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (listData, response) = try await URLSession.shared.data(for: req)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            return nil
+        }
+
+        struct ListRes: Decodable {
+            let messages: [MsgId]?
+            struct MsgId: Decodable { let id: String }
+        }
+        guard let listRes = try? JSONDecoder().decode(ListRes.self, from: listData),
+              let msgs = listRes.messages, !msgs.isEmpty else {
+            return nil
+        }
+
+        for msg in msgs where !seenIds.contains(msg.id) {
+            let msgUrl = URL(string: "https://gmail.googleapis.com/gmail/v1/users/me/messages/\(msg.id)?format=full")!
+            var mReq = URLRequest(url: msgUrl)
+            mReq.timeoutInterval = 10.0
+            mReq.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+            guard let (mData, mResp) = try? await URLSession.shared.data(for: mReq),
+                  let mHttp = mResp as? HTTPURLResponse, mHttp.statusCode == 200,
+                  let json = try? JSONSerialization.jsonObject(with: mData) as? [String: Any] else {
+                continue
+            }
+
+            let internalDateStr = json["internalDate"] as? String ?? "0"
+            let internalDateMs = Int64(internalDateStr) ?? 0
+
+            // Yalnızca yüz modu açıldıktan (veya çok kısa süre öncesinden) sonra gelen yeni mailleri anons et
+            if sinceMs > 0 && internalDateMs > 0 && internalDateMs < (sinceMs - 20_000) {
+                continue
+            }
+
+            let threadId = json["threadId"] as? String ?? ""
+            let snippet = json["snippet"] as? String ?? ""
+            var subject = "Konusuz"
+            var fromHeader = "Bilinmeyen Gönderen"
+            var rfcMessageId = ""
+            var fullBody = ""
+
+            if let payload = json["payload"] as? [String: Any] {
+                if let headers = payload["headers"] as? [[String: Any]] {
+                    for h in headers {
+                        guard let name = h["name"] as? String, let value = h["value"] as? String else { continue }
+                        if name.caseInsensitiveCompare("Subject") == .orderedSame {
+                            subject = value
+                        } else if name.caseInsensitiveCompare("From") == .orderedSame {
+                            fromHeader = value
+                        } else if name.caseInsensitiveCompare("Message-ID") == .orderedSame {
+                            rfcMessageId = value
+                        }
+                    }
+                }
+                fullBody = Self.extractBodyText(from: payload)
+            }
+
+            let (senderName, senderEmail) = Self.parseFromHeader(fromHeader)
+            let cleanBody = fullBody.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ? snippet
+                : String(fullBody.prefix(1200))
+
+            return GmailIncomingEmail(
+                id: msg.id,
+                threadId: threadId,
+                rfcMessageId: rfcMessageId,
+                senderName: senderName,
+                senderEmail: senderEmail,
+                fromHeader: fromHeader,
+                subject: subject,
+                snippet: snippet,
+                bodyText: cleanBody,
+                internalDateMs: internalDateMs
+            )
+        }
+
+        return nil
+    }
+
+    /// Gelen e-postaya aynı Gmail dizisi (thread) içinde yanıt gönderir ve okundu olarak işaretler
+    func replyToEmail(_ incoming: GmailIncomingEmail, body: String) async throws -> Bool {
+        guard let user = await GoogleAuthService.shared.currentUser else {
+            throw NSError(domain: "Gmail", code: 401, userInfo: [NSLocalizedDescriptionKey: "Lütfen önce Google hesabınızı bağlayın."])
+        }
+        let refreshedUser = try await refreshUserIfNeeded(user)
+        let accessToken = refreshedUser.accessToken.tokenString
+
+        let replySubject = incoming.subject.lowercased().hasPrefix("re:")
+            ? incoming.subject
+            : "Re: \(incoming.subject)"
+        let subjectData = replySubject.data(using: .utf8)?.base64EncodedString() ?? ""
+        let encodedSubject = "=?utf-8?B?\(subjectData)?="
+
+        var headers = [
+            "To: \(incoming.senderEmail)",
+            "Subject: \(encodedSubject)",
+            "MIME-Version: 1.0",
+            "Content-Type: text/plain; charset=\"UTF-8\""
+        ]
+        if !incoming.rfcMessageId.isEmpty {
+            headers.append("In-Reply-To: \(incoming.rfcMessageId)")
+            headers.append("References: \(incoming.rfcMessageId)")
+        }
+
+        let rawMessage = headers.joined(separator: "\r\n") + "\r\n\r\n" + body
+        guard let rawData = rawMessage.data(using: .utf8) else { return false }
+
+        let base64Encoded = rawData.base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+
+        var jsonPayload: [String: Any] = ["raw": base64Encoded]
+        if !incoming.threadId.isEmpty {
+            jsonPayload["threadId"] = incoming.threadId
+        }
+
+        var request = URLRequest(url: URL(string: "https://gmail.googleapis.com/gmail/v1/users/me/messages/send")!)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: jsonPayload)
+
+        let (_, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            return false
+        }
+
+        try? await markEmailAsRead(messageId: incoming.id)
+        return true
+    }
+
+    /// Belirtilen e-postadan UNREAD etiketini kaldırır
+    func markEmailAsRead(messageId: String) async throws {
+        guard !messageId.isEmpty, let user = await GoogleAuthService.shared.currentUser else { return }
+        let refreshedUser = try await refreshUserIfNeeded(user)
+        let accessToken = refreshedUser.accessToken.tokenString
+
+        guard let url = URL(string: "https://gmail.googleapis.com/gmail/v1/users/me/messages/\(messageId)/modify") else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["removeLabelIds": ["UNREAD"]])
+        _ = try? await URLSession.shared.data(for: request)
+    }
+
+    private static func parseFromHeader(_ raw: String) -> (name: String, email: String) {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let ltIndex = trimmed.firstIndex(of: "<"),
+           let gtIndex = trimmed.firstIndex(of: ">"),
+           ltIndex < gtIndex {
+            let namePart = String(trimmed[..<ltIndex])
+                .replacingOccurrences(of: "\"", with: "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let emailPart = String(trimmed[trimmed.index(after: ltIndex)..<gtIndex])
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            return (namePart.isEmpty ? emailPart : namePart, emailPart)
+        }
+        return (trimmed, trimmed)
+    }
     
     /// Yapay Zekanın çağıracağı ana mail atma fonksiyonu
     func sendEmail(to recipient: String, subject: String, body: String, attachment: Data? = nil, attachmentName: String = "photo.jpg", attachmentMimeType: String = "image/jpeg") async throws -> Bool {

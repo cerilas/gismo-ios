@@ -49,6 +49,13 @@ final class GismoFaceViewModel: ObservableObject {
     private var lastBrightness: CGFloat = UIScreen.main.brightness
     private var isInitialized: Bool = false
 
+    // MARK: - Canlı Gelen Gmail İzleyici (Yüz AI Modu + Gmail Bağlı + Robot Bağlı)
+    private var incomingMailTask: Task<Void, Never>?
+    private var isFaceModeActive: Bool = false
+    private var seenMailIds: Set<String> = []
+    private var mailMonitorStartMs: Int64 = 0
+    private var hasBaselineMailSnapshot: Bool = false
+
     init(robot: Robot) {
         self.robot = robot
         voiceEngine.robotName = robot.name
@@ -242,6 +249,7 @@ final class GismoFaceViewModel: ObservableObject {
     // MARK: - Lifecycle
 
     func onAppear() {
+        isFaceModeActive = true
         if !isInitialized {
             currentEmotion = .neutral
             gemini.resetHistory()
@@ -253,9 +261,12 @@ final class GismoFaceViewModel: ObservableObject {
         setupVoice()
         vision.start() // Yüz takibini başlat
         startTrackingLoop()
+        startIncomingMailMonitor()
     }
 
     func onDisappear() {
+        isFaceModeActive = false
+        stopIncomingMailMonitor()
         NotificationCenter.default.removeObserver(self, name: UIScreen.brightnessDidChangeNotification, object: nil)
         GismoSoundEngine.shared.stopSpeech()
         geminiLive.disconnect()
@@ -268,6 +279,162 @@ final class GismoFaceViewModel: ObservableObject {
         responseHideTask?.cancel()
         transcriptSyncTask?.cancel()
         idleTask?.cancel()
+    }
+
+    // MARK: - Canlı Gelen E-posta İzleme ve Sesli Özetleme
+
+    /// Koşullar:
+    /// 1) Yüz AI modu açık (`isFaceModeActive` & `AIKeyStore.hasValidKey`)
+    /// 2) Gmail hesabı bağlı (`GoogleAuthService.shared.isConnected`)
+    /// 3) Uygulama ön planda çalışır durumda ve robota bağlı (`UIApplication.shared.applicationState == .active` & `WebSocketService.shared.isRobotConnected`)
+    private func startIncomingMailMonitor() {
+        incomingMailTask?.cancel()
+        if mailMonitorStartMs == 0 {
+            mailMonitorStartMs = Int64(Date().timeIntervalSince1970 * 1000)
+        }
+
+        incomingMailTask = Task { [weak self] in
+            // Robot çevrimiçi bilgisini tazele
+            _ = try? await WebSocketService.shared.fetchRobots()
+
+            while !Task.isCancelled {
+                guard let self else { return }
+
+                let faceOpen = self.isFaceModeActive && AIKeyStore.hasValidKey
+                let gmailConnected = GoogleAuthService.shared.isConnected && GoogleAuthService.shared.currentUser != nil
+                let appActive = UIApplication.shared.applicationState == .active
+                let robotConnected = WebSocketService.shared.isRobotConnected(self.robot.id, fallbackOnline: self.robot.isOnline)
+
+                if faceOpen && gmailConnected && appActive && robotConnected {
+                    if !self.hasBaselineMailSnapshot {
+                        if let initialIds = try? await GmailService.shared.fetchRecentInboxIds(maxResults: 6) {
+                            self.seenMailIds.formUnion(initialIds)
+                            self.mailMonitorStartMs = Int64(Date().timeIntervalSince1970 * 1000)
+                            self.hasBaselineMailSnapshot = true
+                            print("[MailMonitor] Başlangıç kutusu kaydedildi (\(initialIds.count) mail). Yeni mailler bekleniyor...")
+                        }
+                    } else if !self.isThinking && !self.isSpeaking && self.voiceEngine.liveTranscript.isEmpty {
+                        if let newMail = try? await GmailService.shared.checkForNewIncomingEmail(
+                            seenIds: self.seenMailIds,
+                            sinceMs: self.mailMonitorStartMs
+                        ) {
+                            self.seenMailIds.insert(newMail.id)
+                            print("[MailMonitor] Yeni mail yakalandı: \(newMail.senderName) - \(newMail.subject)")
+                            await self.announceIncomingEmail(newMail)
+                        }
+                    }
+                } else if !gmailConnected {
+                    self.hasBaselineMailSnapshot = false
+                    self.seenMailIds.removeAll()
+                }
+
+                try? await Task.sleep(for: .seconds(10))
+            }
+        }
+    }
+
+    private func stopIncomingMailMonitor() {
+        incomingMailTask?.cancel()
+        incomingMailTask = nil
+    }
+
+    /// Yeni gelen e-postayı doğal ve çok kısa bir şekilde seslendirip özetler, ardından kullanıcının aksiyon almasını ("yanıtla", "bir şey yapma" vb.) sağlar.
+    private func announceIncomingEmail(_ mail: GmailIncomingEmail) async {
+        guard isFaceModeActive && !isThinking && !isSpeaking else { return }
+
+        gemini.lastIncomingEmail = mail
+        isThinking = true
+        showResponse = false
+        liveTranscript = ""
+
+        voiceEngine.pauseForSpeech()
+
+        if currentEmotion == .sleeping {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                currentEmotion = .neutral
+            }
+            GismoSoundEngine.shared.play(.wakeUp)
+            try? await Task.sleep(for: .milliseconds(350))
+        }
+
+        GismoSoundEngine.shared.play(.surprised)
+        setEmotion(.surprised, for: 0, playSound: false)
+
+        let notificationPrompt = """
+        [SİSTEM BİLDİRİMİ - YENİ E-POSTA GELDİ]
+        Az önce kullanıcının Gmail hesabına yeni bir mail düştü:
+        Gönderen: \(mail.senderName) <\(mail.senderEmail)>
+        Konu: \(mail.subject)
+        İçerik: \(String(mail.bodyText.prefix(800)))
+
+        Lütfen şimdi kullanıcıya bir mail geldiğini söyle, kimden geldiğini ve neyle ilgili olduğunu ÇOK KISA, samimi ve doğal bir Türkçe ile (1-2 cümlede) özetle ve "Yanıtlamamı ister misin?" diye sor.
+        """
+
+        do {
+            let liveResult = try await geminiLive.sendTurn(notificationPrompt, using: gemini)
+            gemini.recordTurnInHistory(userText: notificationPrompt, modelText: liveResult.text)
+            let steps = liveResult.motorSequence.isEmpty
+                ? defaultMotorSequence(for: .surprised)
+                : liveResult.motorSequence
+
+            if !liveResult.audioData.isEmpty {
+                await presentAndSpeakAudioData(
+                    displayText: liveResult.text,
+                    audioData: liveResult.audioData,
+                    mimeType: liveResult.mimeType,
+                    emotion: .happy,
+                    minDisplaySeconds: liveResult.duration,
+                    motorSteps: steps
+                )
+            } else {
+                await presentAndSpeakResponse(
+                    displayText: liveResult.text,
+                    speechText: liveResult.text,
+                    emotion: .happy,
+                    minDisplaySeconds: liveResult.duration,
+                    motorSteps: steps
+                )
+            }
+        } catch {
+            do {
+                let message = try await gemini.send(notificationPrompt, robotName: robot.name, includeTools: false)
+                let steps = message.motorSequence.isEmpty
+                    ? defaultMotorSequence(for: .surprised)
+                    : message.motorSequence
+
+                if let (ttsAudio, ttsMime) = try? await gemini.synthesizeSpeech(text: message.text, emotion: .happy),
+                   !ttsAudio.isEmpty {
+                    await presentAndSpeakAudioData(
+                        displayText: message.text,
+                        audioData: ttsAudio,
+                        mimeType: ttsMime,
+                        emotion: .happy,
+                        minDisplaySeconds: message.duration,
+                        motorSteps: steps
+                    )
+                } else {
+                    await presentAndSpeakResponse(
+                        displayText: message.text,
+                        speechText: message.text,
+                        emotion: .happy,
+                        minDisplaySeconds: message.duration,
+                        motorSteps: steps
+                    )
+                }
+            } catch {
+                let fallbackSummary = "Hey, bir mail geldi! \(mail.senderName) sana '\(mail.subject)' konulu bir e-posta göndermiş. Yanıtlamamı ister misin?"
+                gemini.recordTurnInHistory(userText: notificationPrompt, modelText: fallbackSummary)
+                await presentAndSpeakResponse(
+                    displayText: fallbackSummary,
+                    speechText: fallbackSummary,
+                    emotion: .happy,
+                    minDisplaySeconds: 5.0,
+                    motorSteps: defaultMotorSequence(for: .surprised)
+                )
+            }
+        }
+
+        resetIdleTimer()
     }
 
     // MARK: - Voice Setup

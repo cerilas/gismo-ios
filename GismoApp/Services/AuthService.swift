@@ -270,7 +270,11 @@ final class AuthService: ObservableObject {
         defer { isLoading = false }
 
         let googleUser: GIDGoogleUser = try await withCheckedThrowingContinuation { continuation in
-            GIDSignIn.sharedInstance.signIn(withPresenting: topVC) { result, error in
+            GIDSignIn.sharedInstance.signIn(
+                withPresenting: topVC,
+                hint: nil,
+                additionalScopes: GoogleAuthService.shared.requiredScopes
+            ) { result, error in
                 if let error = error {
                     continuation.resume(throwing: error)
                     return
