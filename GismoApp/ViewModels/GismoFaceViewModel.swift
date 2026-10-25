@@ -20,6 +20,7 @@ final class GismoFaceViewModel: ObservableObject {
     @Published var showResponse: Bool = false
     @Published var permissionDenied: Bool = false
     @Published var isTrackingEnabled: Bool = false // Kullanıcı "TAKİP" butonuyla açar (FaceTrackingCore ile stabil darbe kontrolü)
+    @Published var isRobotBodyOnline: Bool = true  // Robot gövdesi kapandığında false olur → yüz kapanma animasyonuna geçer
     private var didCapturePhotoInCurrentTurn: Bool = false
 
     private let voiceEngine = GismoVoiceEngine()
@@ -51,6 +52,8 @@ final class GismoFaceViewModel: ObservableObject {
 
     // MARK: - Canlı Gelen Gmail İzleyici (Yüz AI Modu + Gmail Bağlı + Robot Bağlı)
     private var incomingMailTask: Task<Void, Never>?
+    private var robotConnectionMonitorTask: Task<Void, Never>?
+    private var robotNotificationCancellable: AnyCancellable?
     private var isFaceModeActive: Bool = false
     private var seenMailIds: Set<String> = []
     private var mailMonitorStartMs: Int64 = 0
@@ -58,8 +61,25 @@ final class GismoFaceViewModel: ObservableObject {
 
     init(robot: Robot) {
         self.robot = robot
+        let testMode = UserDefaults.standard.bool(forKey: "isTestModeEnabled")
+        self.isRobotBodyOnline = testMode ? true : robot.isOnline
         voiceEngine.robotName = robot.name
         WebSocketService.shared.connect()  // Manuel kontrol gibi komut gönderebilmek için
+
+        robotNotificationCancellable = NotificationCenter.default
+            .publisher(for: WebSocketService.robotsDidChangeNotification)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] notification in
+                guard let self else { return }
+                if UserDefaults.standard.bool(forKey: "isTestModeEnabled") {
+                    self.applyRobotOnlineState(true)
+                    return
+                }
+                if let robots = notification.userInfo?["robots"] as? [Robot],
+                   let updated = robots.first(where: { $0.id == self.robot.id }) {
+                    self.applyRobotOnlineState(updated.isOnline)
+                }
+            }
         
         // Gemini'ye kamera yetkisini devret
         gemini.onTakePhoto = { [weak self] in
@@ -161,7 +181,7 @@ final class GismoFaceViewModel: ObservableObject {
     private static func now() -> Double { ProcessInfo.processInfo.systemUptime }
 
     private var canTrack: Bool {
-        isTrackingEnabled && !isThinking && !showResponse && currentEmotion != .sleeping && !isPhotoCentering
+        isRobotBodyOnline && isTrackingEnabled && !isThinking && !showResponse && currentEmotion != .sleeping && !isPhotoCentering
     }
 
     private func startTrackingLoop() {
@@ -253,7 +273,9 @@ final class GismoFaceViewModel: ObservableObject {
         if !isInitialized {
             currentEmotion = .neutral
             gemini.resetHistory()
-            GismoSoundEngine.shared.play(.startup)
+            if isRobotBodyOnline {
+                GismoSoundEngine.shared.play(.startup)
+            }
             setupBrightnessObserver()
             isInitialized = true
         }
@@ -261,12 +283,14 @@ final class GismoFaceViewModel: ObservableObject {
         setupVoice()
         vision.start() // Yüz takibini başlat
         startTrackingLoop()
+        startRobotConnectionMonitor()
         startIncomingMailMonitor()
     }
 
     func onDisappear() {
         isFaceModeActive = false
         stopIncomingMailMonitor()
+        stopRobotConnectionMonitor()
         NotificationCenter.default.removeObserver(self, name: UIScreen.brightnessDidChangeNotification, object: nil)
         GismoSoundEngine.shared.stopSpeech()
         geminiLive.disconnect()
@@ -279,6 +303,68 @@ final class GismoFaceViewModel: ObservableObject {
         responseHideTask?.cancel()
         transcriptSyncTask?.cancel()
         idleTask?.cancel()
+    }
+
+    // MARK: - Robot Gövdesi Bağlantı İzleme ve Kapanma / Açılma Yönetimi
+
+    private func startRobotConnectionMonitor() {
+        robotConnectionMonitorTask?.cancel()
+        robotConnectionMonitorTask = Task { [weak self] in
+            while !Task.isCancelled {
+                guard let self else { return }
+                if UserDefaults.standard.bool(forKey: "isTestModeEnabled") {
+                    self.applyRobotOnlineState(true)
+                } else {
+                    WebSocketService.shared.connect()
+                    if let robots = try? await WebSocketService.shared.fetchRobots(),
+                       let match = robots.first(where: { $0.id == self.robot.id }) {
+                        self.applyRobotOnlineState(match.isOnline)
+                    } else {
+                        let connected = WebSocketService.shared.isRobotConnected(
+                            self.robot.id,
+                            fallbackOnline: self.isRobotBodyOnline
+                        )
+                        self.applyRobotOnlineState(connected)
+                    }
+                }
+                try? await Task.sleep(for: .seconds(3))
+            }
+        }
+    }
+
+    private func stopRobotConnectionMonitor() {
+        robotConnectionMonitorTask?.cancel()
+        robotConnectionMonitorTask = nil
+    }
+
+    private func applyRobotOnlineState(_ online: Bool) {
+        guard online != isRobotBodyOnline else { return }
+        isRobotBodyOnline = online
+
+        if !online {
+            print("[RobotBody] Robot gövdesi kapandı / bağlantı koptu — yüz kapatılıyor.")
+            GismoSoundEngine.shared.stopSpeech()
+            GismoSoundEngine.shared.play(.sleeping)
+            isThinking = false
+            isSpeaking = false
+            speechLevel = 0
+            showResponse = false
+            liveTranscript = ""
+            stopTrackingMotorIfNeeded()
+            voiceEngine.pauseForSpeech()
+            idleTask?.cancel()
+        } else {
+            print("[RobotBody] Robot gövdesi tekrar bağlandı — yüz yeniden açılıyor!")
+            GismoSoundEngine.shared.play(.startup)
+            setEmotion(.happy, for: 3.0, playSound: false)
+            resetIdleTimer()
+            Task {
+                try? await Task.sleep(for: .milliseconds(450))
+                if self.isFaceModeActive && self.isRobotBodyOnline {
+                    self.voiceEngine.resumeAfterSpeech()
+                }
+            }
+        }
     }
 
     // MARK: - Canlı Gelen E-posta İzleme ve Sesli Özetleme
@@ -505,7 +591,7 @@ final class GismoFaceViewModel: ObservableObject {
     ]
 
     private func handleUtterance(_ text: String) async {
-        guard !isThinking && !isSpeaking else { return }
+        guard isRobotBodyOnline && !isThinking && !isSpeaking else { return }
 
         isThinking = true
         didCapturePhotoInCurrentTurn = false
@@ -726,7 +812,7 @@ final class GismoFaceViewModel: ObservableObject {
     }
 
     func speakDemoGreeting() {
-        guard !isThinking && !isSpeaking else { return }
+        guard isRobotBodyOnline && !isThinking && !isSpeaking else { return }
         Task {
             await handleUtterance("Merhaba Gismo, kendini kısaca tanıtır mısın?")
         }
@@ -756,7 +842,7 @@ final class GismoFaceViewModel: ObservableObject {
     // MARK: - Sleep / Wake
 
     func wakeUp() {
-        guard currentEmotion == .sleeping else { return }
+        guard isRobotBodyOnline, currentEmotion == .sleeping else { return }
         withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
             currentEmotion = .neutral
         }

@@ -211,6 +211,12 @@ struct GismoFaceView: View {
                                 .offset(y: canvasSize * emotion.mouthYOffsetRatio)
                             Spacer(minLength: canvasSize * 0.02)
                         }
+                        .scaleEffect(
+                            x: vm.isRobotBodyOnline ? 1.0 : 0.68,
+                            y: vm.isRobotBodyOnline ? 1.0 : 0.015
+                        )
+                        .opacity(vm.isRobotBodyOnline ? 1.0 : 0.0)
+                        .animation(.easeInOut(duration: 0.55), value: vm.isRobotBodyOnline)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                         // Üst butonlar + duygu + durum (Futuristic Cyber HUD)
@@ -477,6 +483,16 @@ struct GismoFaceView: View {
                     }
                     .transition(.opacity.combined(with: .scale(scale: 0.92)))
                     .zIndex(10)
+                }
+
+                // Robot gövdesi kapandığında / bağlantı koptuğunda kapanma animasyonu ve kilit ekranı
+                if !vm.isRobotBodyOnline {
+                    RobotBodyPowerOffOverlay(
+                        robotName: vm.robot.name,
+                        onClose: { dismiss() }
+                    )
+                    .transition(.opacity)
+                    .zIndex(20)
                 }
             }
         }
@@ -2077,6 +2093,156 @@ struct SMSLoginView: View {
             await MainActor.run {
                 self.errorMessage = "Bağlantı hatası: \(error.localizedDescription)"
                 self.isFetchingHeaders = false
+            }
+        }
+    }
+}
+
+// MARK: - Robot Gövdesi Kapandığında Yüz Kapanma Animasyonu & Bağlantı Bekleme Ekranı
+
+struct RobotBodyPowerOffOverlay: View {
+    let robotName: String
+    let onClose: () -> Void
+
+    @State private var beamScaleX: CGFloat = 1.0
+    @State private var beamScaleY: CGFloat = 1.0
+    @State private var beamOpacity: Double = 1.0
+    @State private var showStandbyCard: Bool = false
+    @State private var pulseGlow: Bool = false
+
+    var body: some View {
+        GeometryReader { geo in
+            ZStack {
+                // Derin siyah kapanma zemini
+                Color(hex: "030308")
+                    .ignoresSafeArea()
+
+                // 1. AŞAMA: CRT / Robot Vizörü Kapanma Çizgisi Animasyonu
+                ZStack {
+                    Capsule()
+                        .fill(
+                            LinearGradient(
+                                colors: [Color(hex: "72DDF7").opacity(0.2), .white, Color(hex: "72DDF7").opacity(0.2)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(width: geo.size.width * 0.78, height: 14)
+                        .scaleEffect(x: beamScaleX, y: beamScaleY)
+                        .shadow(color: Color(hex: "72DDF7"), radius: 22)
+
+                    Circle()
+                        .fill(Color.white)
+                        .frame(width: 18, height: 18)
+                        .scaleEffect(beamScaleX < 0.15 ? 1.2 : 0.01)
+                        .shadow(color: Color(hex: "72DDF7"), radius: 18)
+                }
+                .opacity(beamOpacity)
+
+                // 2. AŞAMA: Kapalı Göz Çizgileri + Bağlantı Bekleniyor Durumu
+                if showStandbyCard {
+                    VStack(spacing: 26) {
+                        // Kapalı uyku/güç-kapalı göz çizgileri
+                        HStack(spacing: min(geo.size.width * 0.12, 90)) {
+                            Capsule()
+                                .fill(Color.white.opacity(0.14))
+                                .frame(width: min(geo.size.width * 0.22, 150), height: 6)
+                            Capsule()
+                                .fill(Color.white.opacity(0.14))
+                                .frame(width: min(geo.size.width * 0.22, 150), height: 6)
+                        }
+
+                        VStack(spacing: 10) {
+                            HStack(spacing: 8) {
+                                Circle()
+                                    .fill(Color(hex: "FF4560"))
+                                    .frame(width: 9, height: 9)
+                                    .scaleEffect(pulseGlow ? 1.25 : 0.85)
+                                    .shadow(color: Color(hex: "FF4560"), radius: 8)
+
+                                Text("\(robotName.uppercased()) GÖVDESİ KAPALI")
+                                    .font(.system(size: 14, weight: .black, design: .monospaced))
+                                    .tracking(1.4)
+                                    .foregroundColor(.white.opacity(0.9))
+                            }
+
+                            Text("Robot gövdesi ile bağlantı kesildi.\nTekrar bağlantı sağlanana kadar yüz modu kapalı kalacaktır.")
+                                .font(.system(size: 13, weight: .medium, design: .rounded))
+                                .foregroundColor(.white.opacity(0.55))
+                                .multilineTextAlignment(.center)
+
+                            HStack(spacing: 8) {
+                                ProgressView()
+                                    .tint(Color(hex: "72DDF7"))
+                                    .scaleEffect(0.8)
+                                Text("Bağlantı bekleniyor...")
+                                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                                    .foregroundColor(Color(hex: "72DDF7").opacity(0.85))
+                            }
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 7)
+                            .background(
+                                Capsule()
+                                    .fill(Color.white.opacity(0.05))
+                                    .overlay(
+                                        Capsule()
+                                            .stroke(Color(hex: "72DDF7").opacity(0.25), lineWidth: 1)
+                                    )
+                            )
+                            .padding(.top, 4)
+                        }
+                        .padding(.horizontal, 28)
+                        .padding(.vertical, 20)
+                        .background(
+                            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                                .fill(Color.white.opacity(0.04))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                                        .stroke(Color.white.opacity(0.10), lineWidth: 1)
+                                )
+                        )
+                    }
+                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                }
+
+                // Sol üst çıkış butonu (kullanıcı isterse ana ekrana dönebilsin)
+                VStack {
+                    HStack {
+                        Button(action: onClose) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundColor(.white.opacity(0.85))
+                                .frame(width: 40, height: 40)
+                                .background(
+                                    Circle()
+                                        .fill(Color.white.opacity(0.08))
+                                        .overlay(Circle().stroke(Color.white.opacity(0.16), lineWidth: 1))
+                                )
+                        }
+                        .buttonStyle(ScaleButtonStyle())
+                        Spacer()
+                    }
+                    .padding(.horizontal, 22)
+                    .padding(.top, 16)
+                    Spacer()
+                }
+            }
+        }
+        .onAppear {
+            withAnimation(.easeInOut(duration: 0.28)) {
+                beamScaleY = 0.22
+            }
+            withAnimation(.easeIn(duration: 0.36).delay(0.22)) {
+                beamScaleX = 0.01
+            }
+            withAnimation(.easeOut(duration: 0.25).delay(0.52)) {
+                beamOpacity = 0.0
+            }
+            withAnimation(.spring(response: 0.45, dampingFraction: 0.82).delay(0.55)) {
+                showStandbyCard = true
+            }
+            withAnimation(.easeInOut(duration: 1.1).repeatForever(autoreverses: true)) {
+                pulseGlow = true
             }
         }
     }
