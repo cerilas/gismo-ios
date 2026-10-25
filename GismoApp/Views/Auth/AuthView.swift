@@ -123,10 +123,6 @@ struct AuthView: View {
                     }
                     .padding(.bottom, 12)
                 }
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    dismissKeyboard()
-                }
             }
             .scrollDismissesKeyboard(.immediately)
         }
@@ -542,11 +538,13 @@ struct AuthView: View {
                         )
                 )
                 .onChange(of: otpCode.wrappedValue) { newValue in
-                    let filtered = newValue.filter(\.isNumber)
-                    if filtered.count > 6 {
-                        otpCode.wrappedValue = String(filtered.prefix(6))
-                    } else if filtered != newValue {
+                    let filtered = String(newValue.filter(\.isNumber).prefix(6))
+                    if otpCode.wrappedValue != filtered {
                         otpCode.wrappedValue = filtered
+                    }
+                    if filtered.count == 6 && !auth.isLoading {
+                        dismissKeyboard()
+                        onVerify()
                     }
                 }
 
@@ -777,7 +775,11 @@ struct AuthView: View {
             return
         }
         Task {
-            try? await auth.loginWithPassword(identifier: id, password: loginPassword)
+            do {
+                try await auth.loginWithPassword(identifier: id, password: loginPassword)
+            } catch {
+                localErrorMessage = error.localizedDescription
+            }
         }
     }
 
@@ -809,7 +811,11 @@ struct AuthView: View {
             return
         }
         Task {
-            try? await auth.loginWithOTP(phone: smsLoginPhone, otpCode: smsLoginOtpCode)
+            do {
+                try await auth.loginWithOTP(phone: smsLoginPhone, otpCode: smsLoginOtpCode)
+            } catch {
+                localErrorMessage = error.localizedDescription
+            }
         }
     }
 
@@ -838,14 +844,36 @@ struct AuthView: View {
 
         Task {
             do {
-                let message = try await auth.sendOTP(phone: phone, email: email, purpose: "register")
+                let message = try await auth.sendOTP(
+                    phone: phone,
+                    email: email,
+                    fullName: name,
+                    password: regPassword,
+                    purpose: "register"
+                )
                 withAnimation {
                     regOtpSent = true
                     resendSecondsRemaining = 60
                     infoBannerMessage = message
                 }
             } catch {
-                localErrorMessage = error.localizedDescription
+                let errText = error.localizedDescription
+                if errText.localizedCaseInsensitiveContains("zaten mevcut") {
+                    // Kullanıcı veritabanında zaten kayıtlıysa şifresi doğruysa direkt giriş yap, değilse Giriş sekmesine geçir
+                    if let _ = try? await auth.loginWithPassword(identifier: phone, password: regPassword) {
+                        return
+                    }
+                    withAnimation {
+                        selectedTab = .login
+                        loginIdentifier = phone
+                        smsLoginPhone = phone
+                        auth.errorMessage = nil
+                        localErrorMessage = nil
+                        infoBannerMessage = "Bu numara veritabanında zaten kayıtlı. Şifrenizle veya SMS kodu ile giriş yapabilirsiniz."
+                    }
+                } else {
+                    localErrorMessage = errText
+                }
             }
         }
     }
@@ -857,13 +885,17 @@ struct AuthView: View {
             return
         }
         Task {
-            try? await auth.register(
-                fullName: regFullName,
-                email: regEmail,
-                phone: regPhone,
-                password: regPassword,
-                otpCode: regOtpCode
-            )
+            do {
+                try await auth.register(
+                    fullName: regFullName,
+                    email: regEmail,
+                    phone: regPhone,
+                    password: regPassword,
+                    otpCode: regOtpCode
+                )
+            } catch {
+                localErrorMessage = error.localizedDescription
+            }
         }
     }
 }

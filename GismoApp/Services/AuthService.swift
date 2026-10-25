@@ -2,6 +2,7 @@ import Foundation
 import SwiftUI
 import GoogleSignIn
 import AuthenticationServices
+import Security
 import UIKit
 
 // MARK: - User Model
@@ -91,16 +92,67 @@ final class AuthService: ObservableObject {
 
     private let tokenKey = "gismo_auth_jwt_token"
     private let userKey  = "gismo_auth_current_user"
+    private let keychainService = "com.cerilas.gismo.auth"
 
     private var authToken: String? {
-        get { UserDefaults.standard.string(forKey: tokenKey) }
+        get {
+            if let token = UserDefaults.standard.string(forKey: tokenKey), !token.isEmpty {
+                return token
+            }
+            if let data = keychainRead(key: tokenKey),
+               let token = String(data: data, encoding: .utf8), !token.isEmpty {
+                UserDefaults.standard.set(token, forKey: tokenKey)
+                return token
+            }
+            return nil
+        }
         set {
-            if let newValue {
+            if let newValue, !newValue.isEmpty {
                 UserDefaults.standard.set(newValue, forKey: tokenKey)
+                if let data = newValue.data(using: .utf8) {
+                    keychainSave(key: tokenKey, data: data)
+                }
             } else {
                 UserDefaults.standard.removeObject(forKey: tokenKey)
+                keychainDelete(key: tokenKey)
             }
         }
+    }
+
+    private func keychainSave(key: String, data: Data) {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: keychainService,
+            kSecAttrAccount as String: key
+        ]
+        SecItemDelete(query as CFDictionary)
+        var addQuery = query
+        addQuery[kSecValueData as String] = data
+        addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
+        SecItemAdd(addQuery as CFDictionary, nil)
+    }
+
+    private func keychainRead(key: String) -> Data? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: keychainService,
+            kSecAttrAccount as String: key,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        guard status == errSecSuccess else { return nil }
+        return item as? Data
+    }
+
+    private func keychainDelete(key: String) {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: keychainService,
+            kSecAttrAccount as String: key
+        ]
+        SecItemDelete(query as CFDictionary)
     }
 
     private init() {
@@ -131,8 +183,16 @@ final class AuthService: ObservableObject {
             needsRobotNamingOnboarding = false
             return
         }
-        let saved = (UserDefaults.standard.string(forKey: robotNameKey(for: user.id)) ?? "")
+        let key = robotNameKey(for: user.id)
+        var saved = (UserDefaults.standard.string(forKey: key) ?? "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
+        if saved.isEmpty,
+           let kcData = keychainRead(key: key),
+           let kcName = String(data: kcData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !kcName.isEmpty {
+            saved = kcName
+            UserDefaults.standard.set(saved, forKey: key)
+        }
         if !saved.isEmpty {
             customRobotName = saved
             needsRobotNamingOnboarding = false
@@ -147,7 +207,11 @@ final class AuthService: ObservableObject {
         let clean = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !clean.isEmpty, let user = currentUser else { return }
 
-        UserDefaults.standard.set(clean, forKey: robotNameKey(for: user.id))
+        let key = robotNameKey(for: user.id)
+        UserDefaults.standard.set(clean, forKey: key)
+        if let data = clean.data(using: .utf8) {
+            keychainSave(key: key, data: data)
+        }
         GismoMemoryService.shared.activeRobotNameOverride = clean
         _ = GismoMemoryService.shared.upsertMemory(
             category: "owner",
@@ -169,9 +233,11 @@ final class AuthService: ObservableObject {
     }
 
     func loadSavedSession() {
+        let userData = UserDefaults.standard.data(forKey: userKey) ?? keychainRead(key: userKey)
         if let token = authToken, !token.isEmpty,
-           let data = UserDefaults.standard.data(forKey: userKey),
+           let data = userData,
            let savedUser = try? JSONDecoder().decode(GismoUser.self, from: data) {
+            UserDefaults.standard.set(data, forKey: userKey)
             applyReviewerDemoModeIfNeeded(for: savedUser)
             self.currentUser = savedUser
             self.isAuthenticated = true
@@ -193,6 +259,7 @@ final class AuthService: ObservableObject {
         self.authToken = token
         if let encoded = try? JSONEncoder().encode(user) {
             UserDefaults.standard.set(encoded, forKey: userKey)
+            keychainSave(key: userKey, data: encoded)
         }
         applyReviewerDemoModeIfNeeded(for: user)
         self.currentUser = user
@@ -234,7 +301,13 @@ final class AuthService: ObservableObject {
 
     // MARK: - 1. Send Cerilas SMS OTP
 
-    func sendOTP(phone: String, email: String? = nil, purpose: String = "register") async throws -> String {
+    func sendOTP(
+        phone: String,
+        email: String? = nil,
+        fullName: String? = nil,
+        password: String? = nil,
+        purpose: String = "register"
+    ) async throws -> String {
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
@@ -245,6 +318,12 @@ final class AuthService: ObservableObject {
         ]
         if let email, !email.isEmpty {
             body["email"] = email
+        }
+        if let fullName, !fullName.isEmpty {
+            body["full_name"] = fullName
+        }
+        if let password, !password.isEmpty {
+            body["password"] = password
         }
 
         let response: SendOTPResponse = try await post(path: "/api/auth/send-otp", body: body)
@@ -471,6 +550,7 @@ final class AuthService: ObservableObject {
     func signOut() {
         authToken = nil
         UserDefaults.standard.removeObject(forKey: userKey)
+        keychainDelete(key: userKey)
         GoogleAuthService.shared.signOut()
         GismoMemoryService.shared.activeRobotNameOverride = nil
         GismoMemoryService.shared.reloadForCurrentUser()
@@ -495,7 +575,9 @@ final class AuthService: ObservableObject {
 
         _ = try? await URLSession.shared.data(for: req)
         if let uid = currentUser?.id {
-            UserDefaults.standard.removeObject(forKey: robotNameKey(for: uid))
+            let key = robotNameKey(for: uid)
+            UserDefaults.standard.removeObject(forKey: key)
+            keychainDelete(key: key)
         }
         GismoMemoryService.shared.clearCurrentUserLocalMemories()
         signOut()
