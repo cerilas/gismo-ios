@@ -99,9 +99,9 @@ struct RobotListView: View {
     // MARK: - Header
 
     private var headerView: some View {
-        HStack(alignment: .center, spacing: 14) {
+        HStack(alignment: .center, spacing: 10) {
             // Brand Emblem + Title (tappable for developer test mode)
-            HStack(spacing: 12) {
+            HStack(spacing: 10) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
                         .fill(
@@ -111,7 +111,7 @@ struct RobotListView: View {
                                 endPoint: .bottomTrailing
                             )
                         )
-                        .frame(width: 46, height: 46)
+                        .frame(width: 44, height: 44)
                         .overlay(
                             RoundedRectangle(cornerRadius: 14, style: .continuous)
                                 .stroke(LinearGradient.accent, lineWidth: 1.4)
@@ -130,10 +130,12 @@ struct RobotListView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 8) {
+                    HStack(spacing: 6) {
                         Text("GISMO")
-                            .font(.system(size: 26, weight: .black, design: .rounded))
-                            .tracking(2)
+                            .font(.system(size: 24, weight: .black, design: .rounded))
+                            .tracking(1.6)
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
                             .foregroundStyle(
                                 LinearGradient(
                                     colors: [.white, Color.gAccent2],
@@ -149,98 +151,104 @@ struct RobotListView: View {
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
                                 .background(Capsule().fill(Color.gWarning))
+                                .fixedSize()
                         }
                     }
 
                     Text(subtextForHeader)
                         .font(.system(size: 12, weight: .semibold, design: .rounded))
                         .foregroundColor(isTestModeEnabled ? .gWarning : .gSubtext)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                 }
             }
+            .layoutPriority(1)
             .contentShape(Rectangle())
             .onTapGesture {
                 handleLogoTap()
             }
 
-            Spacer()
+            Spacer(minLength: 6)
 
-            // User Profile / Account button
-            Button {
-                showUserProfile = true
-            } label: {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 15, style: .continuous)
-                        .fill(Color.gSurface2.opacity(0.85))
-                        .frame(width: 46, height: 46)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 15, style: .continuous)
-                                .stroke(Color.gCyan.opacity(0.4), lineWidth: 1)
-                        )
-
-                    if let initials = userAuth.currentUser?.initials, !initials.isEmpty {
-                        Text(initials)
-                            .font(.system(size: 14, weight: .black, design: .rounded))
-                            .foregroundColor(.gCyan)
-                    } else {
-                        Image(systemName: "person.crop.circle.fill")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(.gCyan)
-                    }
-                }
-            }
-            .buttonStyle(ScaleButtonStyle())
-
-            // Integrations button with live connection dot
-            Button {
-                showIntegrations = true
-            } label: {
-                ZStack(alignment: .topTrailing) {
+            HStack(spacing: 8) {
+                // User Profile / Account button
+                Button {
+                    showUserProfile = true
+                } label: {
                     ZStack {
-                        RoundedRectangle(cornerRadius: 15, style: .continuous)
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
                             .fill(Color.gSurface2.opacity(0.85))
-                            .frame(width: 46, height: 46)
+                            .frame(width: 42, height: 42)
                             .overlay(
-                                RoundedRectangle(cornerRadius: 15, style: .continuous)
-                                    .stroke(
-                                        authService.isConnected ? Color.gSuccess.opacity(0.45) : Color.gBorder,
-                                        lineWidth: 1
-                                    )
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .stroke(Color.gCyan.opacity(0.4), lineWidth: 1)
                             )
 
-                        Image(systemName: "sparkles.rectangle.stack.fill")
-                            .font(.system(size: 17, weight: .semibold))
+                        if let initials = userAuth.currentUser?.initials, !initials.isEmpty {
+                            Text(initials)
+                                .font(.system(size: 13, weight: .black, design: .rounded))
+                                .foregroundColor(.gCyan)
+                        } else {
+                            Image(systemName: "person.crop.circle.fill")
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundColor(.gCyan)
+                        }
+                    }
+                }
+                .buttonStyle(ScaleButtonStyle())
+
+                // Integrations button with live connection dot
+                Button {
+                    showIntegrations = true
+                } label: {
+                    ZStack(alignment: .topTrailing) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .fill(Color.gSurface2.opacity(0.85))
+                                .frame(width: 42, height: 42)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                        .stroke(
+                                            authService.isConnected ? Color.gSuccess.opacity(0.45) : Color.gBorder,
+                                            lineWidth: 1
+                                        )
+                                )
+
+                            Image(systemName: "sparkles.rectangle.stack.fill")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundColor(.white)
+                        }
+
+                        Circle()
+                            .fill(authService.isConnected ? Color.gSuccess : Color.gSubtext.opacity(0.5))
+                            .frame(width: 10, height: 10)
+                            .overlay(Circle().stroke(Color.gBg, lineWidth: 2))
+                            .offset(x: 2, y: -2)
+                    }
+                }
+                .buttonStyle(ScaleButtonStyle())
+
+                // Add robot button
+                Button {
+                    showSetup = true
+                } label: {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(LinearGradient.accent)
+                            .frame(width: 42, height: 42)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .stroke(Color.white.opacity(0.25), lineWidth: 1)
+                            )
+                            .shadow(color: Color.gAccent.opacity(0.4), radius: 12, x: 0, y: 6)
+
+                        Image(systemName: "plus")
+                            .font(.system(size: 17, weight: .bold))
                             .foregroundColor(.white)
                     }
-
-                    Circle()
-                        .fill(authService.isConnected ? Color.gSuccess : Color.gSubtext.opacity(0.5))
-                        .frame(width: 10, height: 10)
-                        .overlay(Circle().stroke(Color.gBg, lineWidth: 2))
-                        .offset(x: 2, y: -2)
                 }
+                .buttonStyle(ScaleButtonStyle())
             }
-            .buttonStyle(ScaleButtonStyle())
-
-            // Add robot button
-            Button {
-                showSetup = true
-            } label: {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 15, style: .continuous)
-                        .fill(LinearGradient.accent)
-                        .frame(width: 46, height: 46)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 15, style: .continuous)
-                                .stroke(Color.white.opacity(0.25), lineWidth: 1)
-                        )
-                        .shadow(color: Color.gAccent.opacity(0.4), radius: 12, x: 0, y: 6)
-
-                    Image(systemName: "plus")
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundColor(.white)
-                }
-            }
-            .buttonStyle(ScaleButtonStyle())
         }
         .padding(.horizontal, 20)
         .padding(.top, 56)
