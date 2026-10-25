@@ -1459,24 +1459,31 @@ final class GoogleAuthService: ObservableObject {
     }
 }
 
-// MARK: - Netgsm SMS Service
+// MARK: - Netgsm SMS Service (Cerilas AS)
 final class SMSService {
     static let shared = SMSService()
     
+    static let defaultCerilasUsername = "8503044989"
+    static let defaultCerilasPassword = "Dnz.24232423"
+    static let defaultCerilasHeader   = "CERILAS AS"
+    
     private var username: String {
-        UserDefaults.standard.string(forKey: "netgsmUsername") ?? ""
+        let saved = (UserDefaults.standard.string(forKey: "netgsmUsername") ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return saved.isEmpty ? Self.defaultCerilasUsername : saved
     }
     
     private var password: String {
-        UserDefaults.standard.string(forKey: "netgsmPassword") ?? ""
+        let saved = (UserDefaults.standard.string(forKey: "netgsmPassword") ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return saved.isEmpty ? Self.defaultCerilasPassword : saved
     }
     
     private var header: String {
-        let savedHeader = UserDefaults.standard.string(forKey: "netgsmHeader") ?? ""
-        return savedHeader.isEmpty ? username : savedHeader
+        let savedHeader = (UserDefaults.standard.string(forKey: "netgsmHeader") ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return savedHeader.isEmpty ? Self.defaultCerilasHeader : savedHeader
     }
     
     private let apiUrl = "https://api.netgsm.com.tr/sms/rest/v2/send"
+    private let otpApiUrl = "https://api.netgsm.com.tr/sms/rest/v2/otp"
     
     private init() {}
     

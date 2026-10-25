@@ -4,6 +4,7 @@ import GoogleSignIn
 @main
 struct GismoApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    @ObservedObject private var userAuth = AuthService.shared
     @State private var showSplash = true
 
     var body: some Scene {
@@ -11,6 +12,10 @@ struct GismoApp: App {
             ZStack {
                 if showSplash {
                     SplashView()
+                        .transition(.opacity)
+                        .zIndex(2)
+                } else if !userAuth.isAuthenticated {
+                    AuthView()
                         .transition(.opacity)
                         .zIndex(1)
                 } else {
@@ -20,8 +25,10 @@ struct GismoApp: App {
                 }
             }
             .animation(.easeInOut(duration: 0.6), value: showSplash)
+            .animation(.easeInOut(duration: 0.4), value: userAuth.isAuthenticated)
             .onAppear {
                 GoogleAuthService.shared.checkStatus()
+                userAuth.loadSavedSession()
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2.6) {
                     showSplash = false
                 }

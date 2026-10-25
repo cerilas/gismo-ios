@@ -3,6 +3,7 @@ import SwiftUI
 struct RobotListView: View {
     @StateObject private var viewModel = RobotListViewModel()
     @ObservedObject private var authService = GoogleAuthService.shared
+    @ObservedObject private var userAuth = AuthService.shared
     @State private var showSetup = false
     @State private var selectedRobot: Robot?
     @State private var headerAppeared = false
@@ -10,6 +11,7 @@ struct RobotListView: View {
     @State private var robotPendingModeSelection: Robot?
     @State private var selectedFaceRobot: Robot?
     @State private var showIntegrations = false
+    @State private var showUserProfile = false
     @State private var robotAwaitingAIKey: Robot?
     @AppStorage(AIKeyStore.storageKey) private var aiKey: String = ""
 
@@ -65,6 +67,9 @@ struct RobotListView: View {
         }
         .sheet(isPresented: $showIntegrations) {
             IntegrationsView()
+        }
+        .sheet(isPresented: $showUserProfile) {
+            UserProfileSheet()
         }
         .alert("Robotu Sil?", isPresented: deleteAlertBinding, presenting: robotPendingDeletion) { robot in
             Button("Vazgeç", role: .cancel) {
@@ -158,6 +163,32 @@ struct RobotListView: View {
             }
 
             Spacer()
+
+            // User Profile / Account button
+            Button {
+                showUserProfile = true
+            } label: {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 15, style: .continuous)
+                        .fill(Color.gSurface2.opacity(0.85))
+                        .frame(width: 46, height: 46)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 15, style: .continuous)
+                                .stroke(Color.gCyan.opacity(0.4), lineWidth: 1)
+                        )
+
+                    if let initials = userAuth.currentUser?.initials, !initials.isEmpty {
+                        Text(initials)
+                            .font(.system(size: 14, weight: .black, design: .rounded))
+                            .foregroundColor(.gCyan)
+                    } else {
+                        Image(systemName: "person.crop.circle.fill")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundColor(.gCyan)
+                    }
+                }
+            }
+            .buttonStyle(ScaleButtonStyle())
 
             // Integrations button with live connection dot
             Button {
