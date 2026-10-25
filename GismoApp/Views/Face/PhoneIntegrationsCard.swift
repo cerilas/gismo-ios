@@ -213,7 +213,7 @@ struct PhoneIntegrationsCard: View {
             }
             .buttonStyle(ScaleButtonStyle())
         case .unavailable:
-            Text("Yok")
+            Text(cap == .health ? "Kurulum gerekli" : "Yok")
                 .font(.system(size: 11, weight: .bold, design: .rounded))
                 .foregroundColor(.gSubtext)
         }

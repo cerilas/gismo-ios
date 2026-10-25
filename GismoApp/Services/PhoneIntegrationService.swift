@@ -140,6 +140,8 @@ final class PhoneIntegrationService: ObservableObject {
     private let messagePresenter = MessageComposerPresenter()
 
     private init() {
+        // HealthKit yeteneği sonradan eklenmiş olabilir: her açılışta yeniden denensin
+        UserDefaults.standard.set(false, forKey: "phoneCap.health.missingEntitlement")
         for cap in PhoneCapability.allCases {
             let key = Self.enabledKey(cap)
             enabledMap[cap] = UserDefaults.standard.object(forKey: key) as? Bool ?? true
@@ -211,6 +213,8 @@ final class PhoneIntegrationService: ObservableObject {
             return states[.alarms] ?? .notDetermined
         case .health:
             guard HKHealthStore.isHealthDataAvailable() else { return .unavailable }
+            // Uygulama HealthKit yeteneği olmadan imzalandıysa (Xcode > Signing & Capabilities > HealthKit eklenmemiş)
+            if UserDefaults.standard.bool(forKey: "phoneCap.health.missingEntitlement") { return .unavailable }
             // Okuma izni durumu gizlilik gereği sorgulanamaz; istendi mi bilgisini tutarız
             return UserDefaults.standard.bool(forKey: "phoneCap.health.requested") ? .granted : .notDetermined
         case .activity:
@@ -274,9 +278,13 @@ final class PhoneIntegrationService: ObservableObject {
             do {
                 try await healthStore.requestAuthorization(toShare: [], read: Self.healthReadTypes)
                 UserDefaults.standard.set(true, forKey: "phoneCap.health.requested")
+                UserDefaults.standard.set(false, forKey: "phoneCap.health.missingEntitlement")
                 return true
             } catch {
                 print("[Health] Yetki hatası: \(error.localizedDescription)")
+                if error.localizedDescription.lowercased().contains("entitlement") {
+                    UserDefaults.standard.set(true, forKey: "phoneCap.health.missingEntitlement")
+                }
                 return false
             }
         case .activity:
@@ -304,6 +312,9 @@ final class PhoneIntegrationService: ObservableObject {
         case .granted:
             return nil
         case .unavailable:
+            if cap == .health && HKHealthStore.isHealthDataAvailable() {
+                return "Sağlık erişimi bu uygulama derlemesinde etkin değil (HealthKit yeteneği eklenmemiş). Geliştirici Xcode'da Signing & Capabilities > + Capability > HealthKit eklemeli."
+            }
             return "\(cap.title) bu cihazda desteklenmiyor."
         case .denied:
             return "\(cap.title) izni reddedilmiş. Kullanıcı iPhone Ayarlar > Gismo bölümünden izni açmalı."
