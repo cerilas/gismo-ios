@@ -83,6 +83,8 @@ final class GeminiService {
     var onCaptureForAnalysis: (() async -> Data?)?
     // 1. sesli denemede spesifik isim/numara/adres/dosya başarısız olursa ekranda yazma kutusu açar
     var onRequestManualInput: ((ManualInputPrompt) -> Void)?
+    /// Kullanıcı "son çektiğin fotoyu / galerideki son fotoyu yükle" dediğinde kamera açmadan galerideki son fotoğrafı kullanır
+    var preferExistingPhotoInCurrentTurn: Bool = false
 
     // Konuşma geçmişi (multi-turn)
     private var history: [[String: Any]] = []
@@ -131,10 +133,11 @@ final class GeminiService {
     Kullanıcı Drive'a not/özet/metin kaydetmek isterse `createDriveFile` aracını kullan.
     FOTOĞRAF KURALLARI:
     1) Kullanıcı sadece "fotoğrafımı çek", "selfie çek", "resmimi çek" derse (yalnızca galeriye kaydetmek için) doğrudan `takePhoto` aracını kullan.
-    2) Kullanıcı "fotoğraf çekip Drive'a yükle" derse `uploadPhotoToDrive` aracını kullan.
-    3) Kullanıcı "fotoğraf çekip Google Fotoğraflar'a yükle" derse `uploadPhotoToGooglePhotos` aracını kullan.
-    4) Kullanıcı "fotoğraf çekip şu adrese mail at" derse `emailPhoto` aracını kullan.
-    5) Google Fotoğraflar'da arama/listeleme için `searchGooglePhotos`, buluttan fotoğraf almak/indirmek için `downloadPhotoFromGoogle` aracını kullan.
+    2) Kullanıcı "fotoğraf çekip Drive'a yükle" derse `uploadPhotoToDrive(useLastPhoto: false)` aracını kullan.
+    3) Kullanıcı "SON ÇEKTİĞİN fotoğrafı / az önceki fotoğrafı / galerideki son fotoğrafı Drive'a yükle" derse ASLA yeniden fotoğraf çekme! `uploadPhotoToDrive(useLastPhoto: true)` aracını kullan.
+    4) Kullanıcı "fotoğraf çekip Google Fotoğraflar'a yükle" derse `uploadPhotoToGooglePhotos(useLastPhoto: false)`, "son çektiğin / galerideki son fotoğrafı Google Fotoğraflar'a yükle" derse `uploadPhotoToGooglePhotos(useLastPhoto: true)` aracını kullan.
+    5) Kullanıcı "fotoğraf çekip şu adrese mail at" derse `emailPhoto(useLastPhoto: false)`, "son çektiğin / galerideki fotoğrafı şu adrese mail at" derse `emailPhoto(useLastPhoto: true)` aracını kullan.
+    6) Google Fotoğraflar'da arama/listeleme için `searchGooglePhotos`, buluttan fotoğraf almak/indirmek için `downloadPhotoFromGoogle` aracını kullan.
 
     ÖNEMLİ KURAL: Kullanıcı "sola git", "sağa dön" gibi ÖZEL BİR HAREKET İSTEMEDİKÇE ASLA MOV: parametresi gönderme! Sadece duyguyu (EMO) gönder, robot varsayılan kafa sallama ve sevinç hareketlerini kendi yapacaktır. (Örn: Sadece ###EMO:happy|3.0### yaz ve bırak).
 
@@ -275,22 +278,24 @@ final class GeminiService {
         ],
         [
             "name": "uploadPhotoToDrive",
-            "description": "Kameradan fotoğraf çeker (galeriye de kaydeder) ve Google Drive'a yükler.",
+            "description": "Google Drive'a fotoğraf yükler. Kullanıcı 'son çektiğin fotoyu / galerideki son fotoyu yükle' dediyse useLastPhoto=true gönder (tekrar fotoğraf çekmez, galerideki son fotoğrafı yükler). 'Fotoğraf çekip yükle' dediyse useLastPhoto=false gönder.",
             "parameters": [
                 "type": "OBJECT",
                 "properties": [
-                    "fileName": ["type": "STRING", "description": "Kaydedilecek fotoğrafın adı (opsiyonel, örn: gismo_selfie.jpg)."]
+                    "fileName": ["type": "STRING", "description": "Kaydedilecek fotoğrafın adı (opsiyonel, örn: gismo_selfie.jpg)."],
+                    "useLastPhoto": ["type": "BOOLEAN", "description": "true = yeni fotoğraf çekmeden galerideki/son çekilen fotoğrafı yükler. false = kameradan yeni fotoğraf çekip yükler."]
                 ]
             ]
         ],
         [
             "name": "uploadPhotoToGooglePhotos",
-            "description": "Kameradan fotoğraf çeker (galeriye de kaydeder) ve doğrudan Google Fotoğraflar (Google Photos) albümüne ve Drive'a yükler.",
+            "description": "Google Fotoğraflar albümüne ve Drive'a fotoğraf yükler. Kullanıcı 'son çektiğin / galerideki son fotoyu yükle' dediyse useLastPhoto=true gönder (tekrar fotoğraf çekmez).",
             "parameters": [
                 "type": "OBJECT",
                 "properties": [
                     "fileName": ["type": "STRING", "description": "Fotoğraf dosya adı (opsiyonel, örn: gismo_ani.jpg)."],
-                    "description": ["type": "STRING", "description": "Fotoğraf açıklaması."]
+                    "description": ["type": "STRING", "description": "Fotoğraf açıklaması."],
+                    "useLastPhoto": ["type": "BOOLEAN", "description": "true = yeni fotoğraf çekmeden galerideki/son çekilen fotoğrafı yükler. false = kameradan yeni fotoğraf çekip yükler."]
                 ]
             ]
         ],
@@ -318,13 +323,14 @@ final class GeminiService {
         ],
         [
             "name": "emailPhoto",
-            "description": "Kameradan anlık fotoğraf çeker (galeriye de kaydeder) ve belirtilen e-posta adresine ek (attachment) olarak gönderir.",
+            "description": "Fotoğrafı belirtilen e-posta adresine ek (attachment) olarak gönderir. Kullanıcı 'son çektiğin / galerideki son fotoğrafı mail at' dediyse useLastPhoto=true gönder (tekrar fotoğraf çekmez).",
             "parameters": [
                 "type": "OBJECT",
                 "properties": [
                     "recipient": ["type": "STRING", "description": "Alıcı e-posta adresi."],
                     "subject": ["type": "STRING", "description": "E-posta konusu (opsiyonel)."],
-                    "body": ["type": "STRING", "description": "E-posta metni (opsiyonel)."]
+                    "body": ["type": "STRING", "description": "E-posta metni (opsiyonel)."],
+                    "useLastPhoto": ["type": "BOOLEAN", "description": "true = yeni fotoğraf çekmeden galerideki/son çekilen fotoğrafı gönderir. false = kameradan yeni fotoğraf çekip gönderir."]
                 ],
                 "required": ["recipient"]
             ]
@@ -836,12 +842,19 @@ final class GeminiService {
         case "uploadPhotoToDrive":
             let rawName = (args["fileName"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             let fileName = rawName.isEmpty ? "gismo_foto_\(Int(Date().timeIntervalSince1970)).jpg" : rawName
-            guard let onTakePhoto = onTakePhoto, let photoData = await onTakePhoto() else {
-                return ("Kamera erişimi yok veya fotoğraf çekilemedi.", [])
+            let useLast = (args["useLastPhoto"] as? Bool == true) || preferExistingPhotoInCurrentTurn
+            let photoData: Data?
+            if useLast {
+                photoData = await GismoCameraService.getLatestGalleryOrCapturedPhotoData()
+            } else {
+                photoData = await onTakePhoto?()
+            }
+            guard let photoData else {
+                return (useLast ? "Galeride veya son çekilenler arasında yüklenecek fotoğraf bulunamadı." : "Kamera erişimi yok veya fotoğraf çekilemedi.", [])
             }
             do {
                 let status = try await GooglePhotosService.shared.uploadPhoto(data: photoData, fileName: fileName)
-                return (status, [])
+                return (useLast ? "Galerinizdeki son fotoğraf Google Drive'a başarıyla yüklendi. (\(status))" : status, [])
             } catch {
                 return ("Fotoğraf yükleme hatası: \(error.localizedDescription)", [])
             }
@@ -850,12 +863,19 @@ final class GeminiService {
             let rawName = (args["fileName"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             let fileName = rawName.isEmpty ? "gismo_foto_\(Int(Date().timeIntervalSince1970)).jpg" : rawName
             let desc = args["description"] as? String ?? "Gismo ile çekilen fotoğraf"
-            guard let onTakePhoto = onTakePhoto, let photoData = await onTakePhoto() else {
-                return ("Kamera erişimi yok veya fotoğraf çekilemedi.", [])
+            let useLast = (args["useLastPhoto"] as? Bool == true) || preferExistingPhotoInCurrentTurn
+            let photoData: Data?
+            if useLast {
+                photoData = await GismoCameraService.getLatestGalleryOrCapturedPhotoData()
+            } else {
+                photoData = await onTakePhoto?()
+            }
+            guard let photoData else {
+                return (useLast ? "Galeride veya son çekilenler arasında yüklenecek fotoğraf bulunamadı." : "Kamera erişimi yok veya fotoğraf çekilemedi.", [])
             }
             do {
                 let status = try await GooglePhotosService.shared.uploadPhoto(data: photoData, fileName: fileName, description: desc)
-                return (status, [])
+                return (useLast ? "Galerinizdeki son fotoğraf Google Fotoğraflar'a başarıyla yüklendi." : status, [])
             } catch {
                 return ("Google Fotoğraflar yükleme hatası: \(error.localizedDescription)", [])
             }
@@ -906,13 +926,20 @@ final class GeminiService {
                 return ("Fotoğrafın gönderileceği e-posta adresi tam anlaşılamadı. Ekranda e-posta yazma kutusu açıldı.", [])
             }
             let subject = (args["subject"] as? String)?.isEmpty == false ? (args["subject"] as! String) : "Gismo'dan Fotoğraf"
-            let body = (args["body"] as? String)?.isEmpty == false ? (args["body"] as! String) : "Merhaba, Gismo ile çekilen fotoğraf ektedir."
-            guard let onTakePhoto = onTakePhoto, let photoData = await onTakePhoto() else {
-                return ("Kamera erişimi yok, fotoğraf çekilemedi.", [])
+            let body = (args["body"] as? String)?.isEmpty == false ? (args["body"] as! String) : "Merhaba, Gismo ile fotoğrafınız ektedir."
+            let useLast = (args["useLastPhoto"] as? Bool == true) || preferExistingPhotoInCurrentTurn
+            let photoData: Data?
+            if useLast {
+                photoData = await GismoCameraService.getLatestGalleryOrCapturedPhotoData()
+            } else {
+                photoData = await onTakePhoto?()
+            }
+            guard let photoData else {
+                return (useLast ? "Galeride gönderilecek fotoğraf bulunamadı." : "Kamera erişimi yok, fotoğraf çekilemedi.", [])
             }
             do {
                 _ = try await GmailService.shared.sendEmail(to: recipient, subject: subject, body: body, attachment: photoData)
-                return ("Fotoğrafınız çekildi, galeriye kaydedildi ve \(recipient) adresine e-posta olarak gönderildi.", [])
+                return (useLast ? "Galerinizdeki son fotoğraf \(recipient) adresine e-posta olarak gönderildi." : "Fotoğrafınız çekildi, galeriye kaydedildi ve \(recipient) adresine e-posta olarak gönderildi.", [])
             } catch {
                 triggerManualInput(
                     kind: .email,
@@ -1158,9 +1185,9 @@ final class GeminiLiveService {
     - Drive'da yeni bir metin/not/özet dosyası oluşturmak için `createDriveFile`,
     - Drive'dan dosya alıp e-posta ile göndermek için `emailDriveFile`,
     - Sadece kameradan fotoğraf/selfie çekip telefon galerisine kaydetmek için `takePhoto`,
-    - Kameradan fotoğraf çekip Google Drive'a yüklemek için `uploadPhotoToDrive`,
-    - Kameradan fotoğraf çekip Google Fotoğraflar'a yüklemek için `uploadPhotoToGooglePhotos`,
-    - Kameradan fotoğraf çekip belirtilen adrese e-posta olarak göndermek için `emailPhoto`,
+    - Kameradan yeni fotoğraf çekip Google Drive'a yüklemek için `uploadPhotoToDrive(useLastPhoto: false)`, kullanıcının "son çektiğin fotoyu / az önceki fotoğrafı / galerideki son fotoğrafı Drive'a yükle" dediği durumlarda YENİ FOTOĞRAF ÇEKMEDEN galerideki son fotoğrafı yüklemek için `uploadPhotoToDrive(useLastPhoto: true)`,
+    - Kameradan yeni fotoğraf çekip Google Fotoğraflar'a yüklemek için `uploadPhotoToGooglePhotos(useLastPhoto: false)`, son çekilen / galerideki son fotoğrafı yüklemek için `uploadPhotoToGooglePhotos(useLastPhoto: true)`,
+    - Kameradan yeni fotoğraf çekip e-posta olarak göndermek için `emailPhoto(useLastPhoto: false)`, son çekilen / galerideki son fotoğrafı e-posta olarak göndermek için `emailPhoto(useLastPhoto: true)`,
     - Google Fotoğraflar'da arama/listeleme için `searchGooglePhotos`, buluttan fotoğraf indirip galeriye kaydetmek veya mail atmak için `downloadPhotoFromGoogle`,
     - Mailleri okumak/aramak/özetlemek için `readEmails`, mail göndermek için `sendEmail`, son gelen maile yanıt vermek için `replyToLastEmail`, son gelen mailde işlem yapmamak/kapatmak için `dismissLastEmail`, gelen maillerin otomatik sesli bildirimini açıp kapatmak için `setIncomingMailNotifications`,
     - Fiziksel hareket için `moveRobot` (1 cm = 15ms; örn: 3 cm ileri = "F,45;S", 360 derece dönüş = "L,1000;S") araçlarını kullan.

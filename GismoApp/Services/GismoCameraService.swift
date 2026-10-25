@@ -13,6 +13,14 @@ final class GismoCameraService: NSObject, ObservableObject {
     @Published var lensMode   = false   // Sol göz → lens animasyonu
     @Published var shutterFlash = false // Fotoğraf çekilme flaşı
 
+    /// Son çekilen fotoğrafın JPEG verisi ("son çektiğin fotoyu yükle / gönder" komutları için)
+    private static var lastCapturedPhotoData: Data?
+
+    private static var lastPhotoCacheURL: URL? {
+        FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first?
+            .appendingPathComponent("gismo_last_captured_photo.jpg")
+    }
+
     private let session     = AVCaptureSession()
     private let photoOutput = AVCapturePhotoOutput()
     private var continuation: CheckedContinuation<UIImage?, Never>?
@@ -93,11 +101,16 @@ final class GismoCameraService: NSObject, ObservableObject {
         // Galeriye kaydet
         if !saveToGallery {
             // Yalnızca analiz amaçlı çekim — galeriye kaydetme
-        } else if photoOK {
-            await Self.saveToPhotoLibrary(image)
         } else {
-            // İzin durumu belirsizse fallback olarak dene
-            UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
+            if let jpeg = image.jpegData(compressionQuality: 0.88) {
+                Self.cacheLastCapturedPhoto(jpeg)
+            }
+            if photoOK {
+                await Self.saveToPhotoLibrary(image)
+            } else {
+                // İzin durumu belirsizse fallback olarak dene
+                UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
+            }
         }
 
         // 3 sn sonra kapat
@@ -159,7 +172,17 @@ final class GismoCameraService: NSObject, ObservableObject {
         session.commitConfiguration()
     }
 
+    static func cacheLastCapturedPhoto(_ data: Data) {
+        lastCapturedPhotoData = data
+        if let url = lastPhotoCacheURL {
+            try? data.write(to: url, options: .atomic)
+        }
+    }
+
     static func saveToPhotoLibrary(_ image: UIImage) async {
+        if let jpeg = image.jpegData(compressionQuality: 0.88) {
+            cacheLastCapturedPhoto(jpeg)
+        }
         await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
             PHPhotoLibrary.shared().performChanges({
                 PHAssetChangeRequest.creationRequestForAsset(from: image)
@@ -173,6 +196,64 @@ final class GismoCameraService: NSObject, ObservableObject {
                     }
                 }
                 cont.resume()
+            }
+        }
+    }
+
+    /// Kullanıcının telefon galerisindeki (Film Rulosu) en son fotoğrafı veya Gismo ile çekilen son fotoğrafı getirir (yeni fotoğraf ÇEKMEZ).
+    static func getLatestGalleryOrCapturedPhotoData() async -> Data? {
+        // 1. Önce telefon galerisinden (PHAsset) en son fotoğrafı okumayı dene
+        if let galleryData = await fetchLatestPhotoFromLibrary() {
+            return galleryData
+        }
+        // 2. Galeriden okuma izni kısıtlıysa Gismo'nun son çekip kaydettiği fotoğrafı döndür
+        if let memData = lastCapturedPhotoData {
+            return memData
+        }
+        if let url = lastPhotoCacheURL, let diskData = try? Data(contentsOf: url), !diskData.isEmpty {
+            lastCapturedPhotoData = diskData
+            return diskData
+        }
+        return nil
+    }
+
+    private static func fetchLatestPhotoFromLibrary() async -> Data? {
+        let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        let authorized: Bool
+        if status == .authorized || status == .limited {
+            authorized = true
+        } else if status == .notDetermined {
+            let newStatus = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
+            authorized = (newStatus == .authorized || newStatus == .limited)
+        } else {
+            authorized = false
+        }
+
+        guard authorized else { return nil }
+
+        let fetchOptions = PHFetchOptions()
+        fetchOptions.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+        fetchOptions.fetchLimit = 1
+
+        let fetchResult = PHAsset.fetchAssets(with: .image, options: fetchOptions)
+        guard let latestAsset = fetchResult.firstObject else { return nil }
+
+        return await withCheckedContinuation { (continuation: CheckedContinuation<Data?, Never>) in
+            let reqOptions = PHImageRequestOptions()
+            reqOptions.isNetworkAccessAllowed = true
+            reqOptions.deliveryMode = .highQualityFormat
+            reqOptions.version = .current
+            reqOptions.isSynchronous = false
+
+            var didResume = false
+            PHImageManager.default().requestImageDataAndOrientation(for: latestAsset, options: reqOptions) { data, _, _, _ in
+                guard !didResume else { return }
+                didResume = true
+                if let data, let uiImage = UIImage(data: data), let jpeg = uiImage.jpegData(compressionQuality: 0.88) {
+                    continuation.resume(returning: jpeg)
+                } else {
+                    continuation.resume(returning: data)
+                }
             }
         }
     }

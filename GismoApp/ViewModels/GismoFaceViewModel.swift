@@ -624,10 +624,18 @@ final class GismoFaceViewModel: ObservableObject {
         GismoSoundEngine.shared.play(.commandReceived)
         setEmotion(.thoughtful, for: 0, playSound: false)
 
-        // Fotoğraf komutu tespiti (arama/indirme komutları hariç)
+        // Fotoğraf komutu tespiti ("son çektiğin fotoyu yükle", "galerideki son fotoyu gönder" gibi komutlarda tekrar fotoğraf ÇEKMEMELİDİR)
         let lowerText = text.lowercased()
-        let isCloudSearchOrDownload = lowerText.contains("indir") || lowerText.contains("listele") || lowerText.contains("ara")
-        let isPhotoCommand = !isCloudSearchOrDownload && photoKeywords.contains { lowerText.contains($0) }
+        let existingPhotoKeywords = [
+            "son çektiğin", "son cektiğin", "son çekilen", "az önce çektiğin",
+            "az önceki", "son foto", "son resmi", "çektiğin foto", "çektiğin resmi",
+            "galerideki", "galerimdeki", "bu fotoğrafı", "o fotoğrafı"
+        ]
+        let refersToExistingPhoto = existingPhotoKeywords.contains { lowerText.contains($0) }
+        gemini.preferExistingPhotoInCurrentTurn = refersToExistingPhoto
+
+        let isCloudSearchOrDownload = lowerText.contains("indir") || lowerText.contains("listele") || lowerText.contains("ara") || lowerText.contains("yükle") || lowerText.contains("yukle") || lowerText.contains("mail")
+        let isPhotoCommand = !isCloudSearchOrDownload && !refersToExistingPhoto && photoKeywords.contains { lowerText.contains($0) }
 
         var assistantReplyForMemory = ""
 
