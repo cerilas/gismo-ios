@@ -21,6 +21,52 @@ enum GismoEmotionName: String {
     case neutral, happy, veryHappy, sad, angry, thoughtful, listening, surprised, sleeping
 }
 
+// MARK: - Manuel Metin Girişi (1. Sesli Deneme Başarısız Olduğunda Açılan Kutu)
+
+enum ManualInputKind: String {
+    case email       // E-posta adresi
+    case driveFile   // Google Drive dosya adı
+    case phoneOrName // Kişi adı veya telefon numarası
+    case general     // Genel spesifik metin / komut
+
+    var defaultTitle: String {
+        switch self {
+        case .email:       return "E-POSTA ADRESİ GİRİN"
+        case .driveFile:   return "DRIVE DOSYA ADI GİRİN"
+        case .phoneOrName: return "KİŞİ ADI / NUMARA GİRİN"
+        case .general:     return "METİN GİRİŞİ"
+        }
+    }
+
+    var defaultPlaceholder: String {
+        switch self {
+        case .email:       return "ornek@domain.com"
+        case .driveFile:   return "Dosya adı (örn: 2026 Hesaplar)"
+        case .phoneOrName: return "Kişi adı veya 05xx xxx xx xx"
+        case .general:     return "Komut veya spesifik metni yazın..."
+        }
+    }
+
+    var iconName: String {
+        switch self {
+        case .email:       return "envelope.fill"
+        case .driveFile:   return "externaldrive.fill.badge.icloud"
+        case .phoneOrName: return "person.crop.circle.badge.questionmark"
+        case .general:     return "keyboard.fill"
+        }
+    }
+}
+
+struct ManualInputPrompt: Identifiable, Equatable {
+    let id = UUID()
+    let kind: ManualInputKind
+    let title: String
+    let subtitle: String
+    let placeholder: String
+    let initialText: String
+    let suggestions: [String]
+}
+
 // MARK: - Gemini Service
 
 final class GeminiService {
@@ -35,6 +81,8 @@ final class GeminiService {
     var onTakePhoto: (() async -> Data?)?
     // Galeriye KAYDETMEDEN analiz için kamera görüntüsü (ViewModel'dan atanacak)
     var onCaptureForAnalysis: (() async -> Data?)?
+    // 1. sesli denemede spesifik isim/numara/adres/dosya başarısız olursa ekranda yazma kutusu açar
+    var onRequestManualInput: ((ManualInputPrompt) -> Void)?
 
     // Konuşma geçmişi (multi-turn)
     private var history: [[String: Any]] = []
@@ -77,6 +125,9 @@ final class GeminiService {
     Eğer kullanıcı "etrafında tam tur dön", "360 derece dön" gibi bir şey isterse, tek bir yöne 1000ms güç vererek bunu başarabilirsin (Örn: MOV:L,1000;S).
     \(PhoneIntegrationService.promptSummary)
     Kullanıcı Drive'daki bir dosyayı okumak/özetlemek isterse doğrudan `readDriveFile` aracına `fileName` (veya biliyorsan `fileId`) vererek tek adımda okuyabilirsin.
+    DRIVE BENZER DOSYA VE MANUEL METİN KUTUSU KURALLARI:
+    1) Drive'da dosya ararken ASLA kullanıcıdan birebir tam dosya adını ezbere söylemesini bekleme! `searchDrive`, `readDriveFile` veya `emailDriveFile` sana `[BENZER DRIVE DOSYALARI BULUNDU]` dönerse, bulduğun benzer dosya isimlerini kullanıcıya doğal bir şekilde söyleyip "Drive'da şu benzer dosyaları buldum: [Dosya 1] mi yoksa [Dosya 2] mi?" diye sor. Kullanıcı hangisi olduğunu söylediğinde o dosyanın tam adını veya ID'sini kullan.
+    2) E-posta adresi, Drive dosya adı, kişi adı veya telefon numarası gibi spesifik girdilerde 1. sesli deneme başarısız olursa (örneğin adres/dosya/kişi bulunamazsa, e-posta adresi bozuk çevrilirse veya kullanıcı "hayır yanlış anladın / o adres değil / o dosya değil" derse), kullanıcıyı tekrar sesle söylemeye zorlama; hemen `requestManualTextInput` aracını çağırarak ekranda yazma kutusunu aç ve "Ekranda açtığım kutuya el ile yazabilirsin." de.
     Kullanıcı Drive'a not/özet/metin kaydetmek isterse `createDriveFile` aracını kullan.
     FOTOĞRAF KURALLARI:
     1) Kullanıcı sadece "fotoğrafımı çek", "selfie çek", "resmimi çek" derse (yalnızca galeriye kaydetmek için) doğrudan `takePhoto` aracını kullan.
@@ -300,6 +351,28 @@ final class GeminiService {
                     "name": ["type": "STRING", "description": "Rehberde aranacak kişinin adı (Örn: Ömer, Annem)"]
                 ],
                 "required": ["name"]
+            ]
+        ],
+        [
+            "name": "requestManualTextInput",
+            "description": "E-posta adresi, Drive dosya adı, kişi adı veya telefon numarası gibi spesifik girdiler 1. sesli denemede yanlış anlaşıldığında, bulunamadığında veya kullanıcı 'hayır yanlış' dediğinde ekranda kullanıcının el ile yazabileceği bir metin kutusu açar.",
+            "parameters": [
+                "type": "OBJECT",
+                "properties": [
+                    "fieldType": [
+                        "type": "STRING",
+                        "description": "Girdi türü: 'email' (e-posta adresi), 'driveFile' (Drive dosya adı), 'phoneOrName' (kişi adı veya telefon numarası), 'general' (diğer spesifik metin)."
+                    ],
+                    "reason": [
+                        "type": "STRING",
+                        "description": "Kullanıcıya gösterilecek kısa açıklama (örn: 'E-posta adresini el ile yazın')."
+                    ],
+                    "initialValue": [
+                        "type": "STRING",
+                        "description": "Varsa sesli algılanan taslak metin."
+                    ]
+                ],
+                "required": ["fieldType"]
             ]
         ]
     ]
@@ -569,14 +642,35 @@ final class GeminiService {
             return ("Robot hareket komutu uygulandı: \(movStr)", steps)
 
         case "sendEmail":
-            let recipient = Self.normalizeEmailAddress(args["recipient"] as? String ?? "")
+            let rawRecipient = args["recipient"] as? String ?? ""
+            let recipient = Self.normalizeEmailAddress(rawRecipient)
             let subject = args["subject"] as? String ?? "Gismo Mesajı"
             let body = args["body"] as? String ?? ""
+            guard Self.isValidEmailFormat(recipient) else {
+                triggerManualInput(
+                    kind: .email,
+                    subtitle: "E-posta adresi sesle tam anlaşılamadı. Lütfen adresi aşağıya yazın:",
+                    initialText: recipient
+                )
+                return ("E-posta adresi tam anlaşılamadı. Kullanıcının adresi el ile girebilmesi için ekranda yazma kutusu açıldı.", [])
+            }
             do {
                 let success = try await GmailService.shared.sendEmail(to: recipient, subject: subject, body: body)
-                return (success ? "\(recipient) adresine e-posta başarıyla gönderildi." : "E-posta gönderilemedi.", [])
+                if !success {
+                    triggerManualInput(
+                        kind: .email,
+                        subtitle: "E-posta gönderilemedi. Lütfen alıcı adresini kontrol edip el ile girin:",
+                        initialText: recipient
+                    )
+                }
+                return (success ? "\(recipient) adresine e-posta başarıyla gönderildi." : "E-posta gönderilemedi, ekranda adres giriş kutusu açıldı.", [])
             } catch {
-                return ("E-posta hatası: \(error.localizedDescription)", [])
+                triggerManualInput(
+                    kind: .email,
+                    subtitle: "E-posta gönderilirken adres hatası oluştu. Lütfen adresi el ile yazın:",
+                    initialText: recipient
+                )
+                return ("E-posta hatası: \(error.localizedDescription). Ekranda adres yazma kutusu açıldı.", [])
             }
 
         case "replyToLastEmail":
@@ -627,8 +721,22 @@ final class GeminiService {
             let query = args["query"] as? String ?? ""
             do {
                 let result = try await GoogleDriveService.shared.searchFiles(query: query)
+                if result.contains("[DRIVE DOSYASI BULUNAMADI]") {
+                    let suggestions = GoogleDriveService.shared.lastSuggestedFiles.map { $0.name }
+                    triggerManualInput(
+                        kind: .driveFile,
+                        subtitle: "'\(query)' adında bir dosya bulunamadı. Dosya adını aşağıya yazabilir veya listeden seçebilirsiniz:",
+                        initialText: query,
+                        suggestions: suggestions
+                    )
+                }
                 return (result, [])
             } catch {
+                triggerManualInput(
+                    kind: .driveFile,
+                    subtitle: "Drive dosya adını el ile yazabilirsiniz:",
+                    initialText: query
+                )
                 return ("Drive araması başarısız: \(error.localizedDescription)", [])
             }
 
@@ -639,7 +747,14 @@ final class GeminiService {
                 let content = try await GoogleDriveService.shared.readTextFile(fileId: fileId, fileName: fileName)
                 return (content, [])
             } catch {
-                return ("Dosya okunamadı: \(error.localizedDescription)", [])
+                let suggestions = GoogleDriveService.shared.lastSuggestedFiles.map { $0.name }
+                triggerManualInput(
+                    kind: .driveFile,
+                    subtitle: "'\(fileName.isEmpty ? fileId : fileName)' dosyası bulunamadı. Lütfen dosya adını yazın veya önerilerden seçin:",
+                    initialText: fileName,
+                    suggestions: suggestions
+                )
+                return ("Dosya bulunamadı (\(error.localizedDescription)). Kullanıcının dosya adını el ile yazabilmesi için ekranda metin kutusu açıldı.", [])
             }
 
         case "createDriveFile":
@@ -653,14 +768,45 @@ final class GeminiService {
             }
 
         case "emailDriveFile":
-            let fileId = args["fileId"] as? String ?? ""
-            let fileNameArg = args["fileName"] as? String ?? ""
+            let fileId = (args["fileId"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            let fileNameArg = (args["fileName"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             let targetRef = !fileId.isEmpty ? fileId : fileNameArg
             let recipient = Self.normalizeEmailAddress(args["recipient"] as? String ?? "")
             let subject = args["subject"] as? String ?? "Google Drive Dosyası"
             let body = args["body"] as? String ?? "Merhaba, istediğiniz Google Drive dosyası ektedir."
+
+            guard Self.isValidEmailFormat(recipient) else {
+                triggerManualInput(
+                    kind: .email,
+                    subtitle: "Dosyanın gönderileceği e-posta adresi tam anlaşılamadı. Lütfen adresi el ile yazın:",
+                    initialText: recipient
+                )
+                return ("Alıcı e-posta adresi geçersiz veya anlaşılamadı. Ekranda e-posta yazma kutusu açıldı.", [])
+            }
+
             do {
-                let (data, mimeType, resolvedName) = try await GoogleDriveService.shared.downloadFileRaw(fileId: targetRef, asText: false)
+                let looksLikeId = !fileId.isEmpty && !fileId.contains(" ") && fileId.count >= 18 && !fileId.contains(".")
+                var resolvedTarget = targetRef
+                if !looksLikeId {
+                    let (exactMatch, similarFiles, _) = try await GoogleDriveService.shared.findBestAndSimilarFiles(query: targetRef, limit: 4)
+                    if let exact = exactMatch {
+                        resolvedTarget = exact.id
+                    } else if similarFiles.count == 1, let only = similarFiles.first, GoogleDriveService.similarityScore(query: targetRef, fileName: only.name) >= 0.62 {
+                        resolvedTarget = only.id
+                    } else if !similarFiles.isEmpty {
+                        let optionsList = similarFiles.enumerated().map { idx, item in
+                            "\(idx + 1)) \(item.name) (ID: \(item.id))"
+                        }.joined(separator: "\n")
+                        return ("""
+                        [BENZER DRIVE DOSYALARI BULUNDU - KULLANICIYA SOR]
+                        '\(targetRef)' adıyla birebir tek bir dosya yerine şu benzer dosyalar bulundu:
+                        \(optionsList)
+                        Lütfen kullanıcıya "Drive'da şu benzer dosyaları buldum: hangi dosyayı \(recipient) adresine göndermemi istersin?" diye sor.
+                        """, [])
+                    }
+                }
+
+                let (data, mimeType, resolvedName) = try await GoogleDriveService.shared.downloadFileRaw(fileId: resolvedTarget, asText: false)
                 _ = try await GmailService.shared.sendEmail(
                     to: recipient,
                     subject: subject,
@@ -671,7 +817,14 @@ final class GeminiService {
                 )
                 return ("Drive'daki '\(resolvedName)' dosyası \(recipient) adresine başarıyla e-posta ile gönderildi.", [])
             } catch {
-                return ("Dosya gönderim hatası: \(error.localizedDescription)", [])
+                let suggestions = GoogleDriveService.shared.lastSuggestedFiles.map { $0.name }
+                triggerManualInput(
+                    kind: .driveFile,
+                    subtitle: "Gönderilecek Drive dosyası bulunamadı. Lütfen dosya adını yazın veya listeden seçin:",
+                    initialText: fileNameArg,
+                    suggestions: suggestions
+                )
+                return ("Dosya gönderim hatası: \(error.localizedDescription). Ekranda dosya adı yazma kutusu açıldı.", [])
             }
 
         case "takePhoto":
@@ -744,8 +897,13 @@ final class GeminiService {
 
         case "emailPhoto":
             let recipient = Self.normalizeEmailAddress(args["recipient"] as? String ?? "")
-            guard !recipient.isEmpty else {
-                return ("Fotoğrafın gönderileceği e-posta adresi belirtilmedi.", [])
+            guard Self.isValidEmailFormat(recipient) else {
+                triggerManualInput(
+                    kind: .email,
+                    subtitle: "Fotoğrafın gönderileceği e-posta adresini aşağıya yazın:",
+                    initialText: recipient
+                )
+                return ("Fotoğrafın gönderileceği e-posta adresi tam anlaşılamadı. Ekranda e-posta yazma kutusu açıldı.", [])
             }
             let subject = (args["subject"] as? String)?.isEmpty == false ? (args["subject"] as! String) : "Gismo'dan Fotoğraf"
             let body = (args["body"] as? String)?.isEmpty == false ? (args["body"] as! String) : "Merhaba, Gismo ile çekilen fotoğraf ektedir."
@@ -756,7 +914,12 @@ final class GeminiService {
                 _ = try await GmailService.shared.sendEmail(to: recipient, subject: subject, body: body, attachment: photoData)
                 return ("Fotoğrafınız çekildi, galeriye kaydedildi ve \(recipient) adresine e-posta olarak gönderildi.", [])
             } catch {
-                return ("Fotoğraf e-posta hatası: \(error.localizedDescription)", [])
+                triggerManualInput(
+                    kind: .email,
+                    subtitle: "Fotoğraf gönderilirken e-posta adresi hatası oluştu. Lütfen adresi el ile girin:",
+                    initialText: recipient
+                )
+                return ("Fotoğraf e-posta hatası: \(error.localizedDescription). Ekranda yazma kutusu açıldı.", [])
             }
 
         case "sendSMS":
@@ -776,7 +939,12 @@ final class GeminiService {
             }
 
             guard let finalNumber = targetNumber else {
-                return ("Alıcı telefon numarası rehberde bulunamadı.", [])
+                triggerManualInput(
+                    kind: .phoneOrName,
+                    subtitle: "Alıcı kişi rehberde bulunamadı. Lütfen kişi adını veya telefon numarasını el ile yazın:",
+                    initialText: nameFromArgs ?? phoneFromArgs ?? ""
+                )
+                return ("Alıcı telefon numarası rehberde bulunamadı. Kullanıcının el ile girmesi için ekranda metin kutusu açıldı.", [])
             }
             do {
                 _ = try await SMSService.shared.sendSMS(to: finalNumber, message: message)
@@ -791,10 +959,29 @@ final class GeminiService {
                 if let foundNumber = try await SMSService.shared.searchContact(by: contactName) {
                     return ("\(contactName) kişisinin numarası: \(foundNumber)", [])
                 }
-                return ("Rehberde '\(contactName)' bulunamadı.", [])
+                triggerManualInput(
+                    kind: .phoneOrName,
+                    subtitle: "'\(contactName)' rehberde bulunamadı. Kişi adını veya telefon numarasını el ile yazabilirsiniz:",
+                    initialText: contactName
+                )
+                return ("Rehberde '\(contactName)' bulunamadı. Ekranda isim/numara yazma kutusu açıldı.", [])
             } catch {
                 return ("Rehber erişim hatası: \(error.localizedDescription)", [])
             }
+
+        case "requestManualTextInput":
+            let fieldTypeRaw = (args["fieldType"] as? String ?? "general").trimmingCharacters(in: .whitespacesAndNewlines)
+            let kind = ManualInputKind(rawValue: fieldTypeRaw) ?? .general
+            let reason = (args["reason"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            let initialValue = (args["initialValue"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            let suggestions = kind == .driveFile ? GoogleDriveService.shared.lastSuggestedFiles.map { $0.name } : []
+            triggerManualInput(
+                kind: kind,
+                subtitle: reason.isEmpty ? "Sesli algılamada karışıklık olmaması için lütfen aşağıya el ile yazın:" : reason,
+                initialText: initialValue,
+                suggestions: suggestions
+            )
+            return ("Ekranda kullanıcının el ile yazabileceği metin kutusu açıldı.", [])
 
         case "analyzeCamera":
             if let msg = await PhoneIntegrationService.shared.cameraReadyMessage() { return (msg, []) }
@@ -860,12 +1047,61 @@ final class GeminiService {
         throw lastError
     }
 
-    private static func normalizeEmailAddress(_ raw: String) -> String {
-        raw.replacingOccurrences(of: " ", with: "")
-            .replacingOccurrences(of: "et", with: "@")
-            .replacingOccurrences(of: "nokta", with: ".")
-            .replacingOccurrences(of: "at", with: "@")
-            .lowercased()
+    func triggerManualInput(
+        kind: ManualInputKind,
+        title: String? = nil,
+        subtitle: String,
+        initialText: String = "",
+        suggestions: [String] = []
+    ) {
+        let prompt = ManualInputPrompt(
+            kind: kind,
+            title: title ?? kind.defaultTitle,
+            subtitle: subtitle,
+            placeholder: kind.defaultPlaceholder,
+            initialText: initialText,
+            suggestions: suggestions
+        )
+        DispatchQueue.main.async { [weak self] in
+            self?.onRequestManualInput?(prompt)
+        }
+    }
+
+    static func isValidEmailFormat(_ email: String) -> Bool {
+        let trimmed = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count >= 5,
+              let atIndex = trimmed.firstIndex(of: "@"),
+              trimmed[..<atIndex].count >= 1 else {
+            return false
+        }
+        let domainPart = String(trimmed[trimmed.index(after: atIndex)...])
+        return domainPart.contains(".") && domainPart.count >= 3 && !domainPart.hasSuffix(".") && !domainPart.contains("@")
+    }
+
+    static func normalizeEmailAddress(_ raw: String) -> String {
+        var working = " " + raw.lowercased() + " "
+        let replacements: [(String, String)] = [
+            (" et ", "@"),
+            (" at ", "@"),
+            (" nokta ", "."),
+            (" dot ", "."),
+            (" alt tire ", "_"),
+            (" alttire ", "_"),
+            (" tire ", "-"),
+            (" çizgi ", "-"),
+            ("ı", "i"),
+            ("ş", "s"),
+            ("ğ", "g"),
+            ("ü", "u"),
+            ("ö", "o"),
+            ("ç", "c")
+        ]
+        for (target, rep) in replacements {
+            working = working.replacingOccurrences(of: target, with: rep)
+        }
+        return working
+            .replacingOccurrences(of: " ", with: "")
+            .trimmingCharacters(in: CharacterSet(charactersIn: ".,;:!?'\""))
     }
 
     private static func extractAPIErrorMessage(from data: Data) -> String {
@@ -929,6 +1165,9 @@ final class GeminiLiveService {
     - Mailleri okumak/aramak/özetlemek için `readEmails`, mail göndermek için `sendEmail`, son gelen maile yanıt vermek için `replyToLastEmail`, son gelen mailde işlem yapmamak/kapatmak için `dismissLastEmail`, gelen maillerin otomatik sesli bildirimini açıp kapatmak için `setIncomingMailNotifications`,
     - Fiziksel hareket için `moveRobot` (1 cm = 15ms; örn: 3 cm ileri = "F,45;S", 360 derece dönüş = "L,1000;S") araçlarını kullan.
     Kullanıcı SMS veya E-posta göndermek/yanıtlamak istediğinde önce alıcıyı ve mesajı kısaca tekrar edip onay iste; sadece onay verdiğinde ilgili aracı çağır.
+    DRIVE BENZER DOSYA VE MANUEL METİN KUTUSU KURALLARI:
+    - Drive'da dosya ararken ASLA kullanıcıdan birebir tam dosya adını ezbere söylemesini bekleme! `searchDrive`, `readDriveFile` veya `emailDriveFile` aracından `[BENZER DRIVE DOSYALARI BULUNDU]` dönerse, bulduğun benzer dosya isimlerini kullanıcıya söyleyip "Drive'da şu benzer dosyaları buldum: şu dosya mı yoksa bu dosya mı?" diye sor. Kullanıcı hangisini seçerse onun tam adını veya ID'sini kullan.
+    - E-posta adresi, Drive dosya adı, kişi adı veya telefon numarası gibi spesifik girdilerde 1. sesli deneme başarısız olursa (örneğin adres/dosya/kişi bulunamazsa, e-posta adresi bozuk çevrilirse veya kullanıcı "hayır yanlış anladın / o adres değil / o dosya değil" derse), kullanıcıyı tekrar sesle söylemeye zorlama; hemen `requestManualTextInput` aracını çağırarak ekranda yazma kutusunu aç ve "Ekranda açtığım kutuya el ile yazabilirsin." de.
     Kullanıcı "artık gelen mailleri okuma", "gelen mailleri bildirme", "mail bildirimlerini kapat" derse `setIncomingMailNotifications(enabled: false)` çağır. "Gelen mailleri bana bildir", "mail gelirse haber ver" derse `setIncomingMailNotifications(enabled: true)` çağır.
     Sana `[SİSTEM BİLDİRİMİ - YENİ E-POSTA GELDİ]` iletildiğinde:
     - Doğrudan doğal ve samimi bir şekilde "Bir mail geldi!" diyerek kimden geldiğini ve içeriğini ÇOK KISA (1-2 cümle) özetle ve "Yanıtlamamı ister misin?" diye sor.

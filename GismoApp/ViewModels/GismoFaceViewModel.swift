@@ -21,6 +21,9 @@ final class GismoFaceViewModel: ObservableObject {
     @Published var permissionDenied: Bool = false
     @Published var isTrackingEnabled: Bool = false // Kullanıcı "TAKİP" butonuyla açar (FaceTrackingCore ile stabil darbe kontrolü)
     @Published var isRobotBodyOnline: Bool = true  // Robot gövdesi kapandığında false olur → yüz kapanma animasyonuna geçer
+    @Published var activeManualInputPrompt: ManualInputPrompt? = nil // 1. deneme başarısız olduğunda açılan yazma kutusu
+    @Published var manualInputText: String = ""
+    private var lastSpecificInputKind: ManualInputKind? = nil
     private var didCapturePhotoInCurrentTurn: Bool = false
 
     private let voiceEngine = GismoVoiceEngine()
@@ -90,6 +93,11 @@ final class GismoFaceViewModel: ObservableObject {
         gemini.onCaptureForAnalysis = { [weak self] in
             guard let self = self else { return nil }
             return await self.captureFrameForAnalysis()
+        }
+        // 1. sesli denemede spesifik isim/numara/adres/dosya başarısız olursa ekranda yazma kutusu aç
+        gemini.onRequestManualInput = { [weak self] prompt in
+            guard let self = self else { return }
+            self.presentManualInput(prompt)
         }
         
         // Gülümseme algılandığında tepki ver (konuşma esnasında ağız hareketlerinin melodi döngüsüne girmesini önle)
@@ -593,7 +601,7 @@ final class GismoFaceViewModel: ObservableObject {
         "fotoğraf al", "beni çek", "resim al", "foto çek"
     ]
 
-    private func handleUtterance(_ text: String) async {
+    private func handleUtterance(_ text: String, isFromManualInput: Bool = false) async {
         guard isRobotBodyOnline && !isThinking && !isSpeaking else { return }
 
         isThinking = true
@@ -706,6 +714,11 @@ final class GismoFaceViewModel: ObservableObject {
             }
         }
 
+        // 1. sesli denemede spesifik girdi (e-posta, Drive dosyası, kişi/numara) başarısız olduysa veya yanlış anlaşıldıysa yazma kutusunu aç
+        if !isFromManualInput {
+            evaluateSpecificInputFailureAfterTurn(userText: text, assistantReply: assistantReplyForMemory)
+        }
+
         // Arka planda konuşmayı analiz et (sahibi, tanışılan kişiler, konuşulan konular veya "bunu aklında tut" notlarını kalıcı hafızaya kaydet)
         let currentKey = gemini.apiKey
         let replySnapshot = assistantReplyForMemory
@@ -769,7 +782,7 @@ final class GismoFaceViewModel: ObservableObject {
         scheduleHideResponse(after: 2.5)
 
         try? await Task.sleep(for: .milliseconds(250))
-        if currentEmotion != .sleeping {
+        if currentEmotion != .sleeping && activeManualInputPrompt == nil {
             voiceEngine.resumeAfterSpeech()
         }
     }
@@ -790,7 +803,9 @@ final class GismoFaceViewModel: ObservableObject {
             showResponse = true
             executeMotorSequence(motorSteps)
             scheduleHideResponse(after: max(4.0, minDisplaySeconds + 1.5))
-            voiceEngine.resumeAfterSpeech()
+            if activeManualInputPrompt == nil {
+                voiceEngine.resumeAfterSpeech()
+            }
             return
         }
 
@@ -826,9 +841,193 @@ final class GismoFaceViewModel: ObservableObject {
 
         // Yankı oluşmaması için kısa bir nefes payı bırakıp mikrofonu tekrar aç
         try? await Task.sleep(for: .milliseconds(250))
-        if currentEmotion != .sleeping {
+        if currentEmotion != .sleeping && activeManualInputPrompt == nil {
             voiceEngine.resumeAfterSpeech()
         }
+    }
+
+    // MARK: - Manuel Metin Giriş Kutusu (1. Sesli Deneme Başarısız Olduğunda)
+
+    func presentManualInput(_ prompt: ManualInputPrompt) {
+        withAnimation(.spring(response: 0.38, dampingFraction: 0.82)) {
+            activeManualInputPrompt = prompt
+            manualInputText = prompt.initialText
+        }
+        voiceEngine.pauseForSpeech()
+
+        // Eğer Drive dosya seçimi için açıldıysa ve henüz öneri listesi boşsa, son Drive dosyalarını yükle
+        if prompt.kind == .driveFile && prompt.suggestions.isEmpty {
+            Task {
+                if let files = try? await GoogleDriveService.shared.fetchDriveFiles(query: "", pageSize: 5), !files.isEmpty {
+                    let names = files.map { $0.name }
+                    await MainActor.run {
+                        if let current = self.activeManualInputPrompt, current.id == prompt.id {
+                            self.activeManualInputPrompt = ManualInputPrompt(
+                                kind: current.kind,
+                                title: current.title,
+                                subtitle: current.subtitle,
+                                placeholder: current.placeholder,
+                                initialText: current.initialText,
+                                suggestions: names
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    func openManualInputFromHUD() {
+        let kind = lastSpecificInputKind ?? .general
+        let suggestions = kind == .driveFile ? GoogleDriveService.shared.lastSuggestedFiles.map { $0.name } : []
+        presentManualInput(
+            ManualInputPrompt(
+                kind: kind,
+                title: kind.defaultTitle,
+                subtitle: "Sesle anlaşılmayan e-posta, Drive dosya adı, numara veya komutunuzu el ile yazabilirsiniz:",
+                placeholder: kind.defaultPlaceholder,
+                initialText: "",
+                suggestions: suggestions
+            )
+        )
+    }
+
+    func dismissManualInput() {
+        withAnimation(.easeOut(duration: 0.22)) {
+            activeManualInputPrompt = nil
+            manualInputText = ""
+        }
+        if isRobotBodyOnline && currentEmotion != .sleeping && !isThinking && !isSpeaking {
+            voiceEngine.resumeAfterSpeech()
+        }
+    }
+
+    func submitManualInput(_ customText: String? = nil) {
+        let value = (customText ?? manualInputText).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return }
+
+        let kind = activeManualInputPrompt?.kind ?? .general
+        withAnimation(.easeOut(duration: 0.22)) {
+            activeManualInputPrompt = nil
+            manualInputText = ""
+        }
+        lastSpecificInputKind = nil
+
+        let contextualMessage: String
+        switch kind {
+        case .email:
+            let cleanEmail = GeminiService.normalizeEmailAddress(value)
+            contextualMessage = "Kullanıcı e-posta adresini metin kutusundan el ile tam olarak şöyle girdi: \(cleanEmail). Lütfen bu e-posta adresini birebir kullanarak işlemi sürdür."
+        case .driveFile:
+            contextualMessage = "Kullanıcı Google Drive dosya adını metin kutusundan el ile tam olarak şöyle girdi: '\(value)'. Lütfen Drive'da bu dosyayı bulup işlemi sürdür."
+        case .phoneOrName:
+            contextualMessage = "Kullanıcı kişi adını veya telefon numarasını metin kutusundan el ile tam olarak şöyle girdi: '\(value)'. Lütfen bu bilgiyi kullanarak işlemi sürdür."
+        case .general:
+            contextualMessage = value
+        }
+
+        Task {
+            await self.handleUtterance(contextualMessage, isFromManualInput: true)
+        }
+    }
+
+    /// 1. sesli denemede spesifik isim/numara/adres/dosya komutunun başarısız olup olmadığını veya kullanıcı tarafından reddedildiğini tespit eder.
+    private func evaluateSpecificInputFailureAfterTurn(userText: String, assistantReply: String) {
+        // Eğer araç çağrısı sırasında zaten kutu açıldıysa tekrar işlem yapma
+        guard activeManualInputPrompt == nil else {
+            lastSpecificInputKind = nil
+            return
+        }
+
+        let uLower = userText.lowercased()
+        let aLower = assistantReply.lowercased()
+
+        // İşlem başarıyla tamamlandıysa sıfırla
+        let successMarkers = ["başarıyla gönderildi", "oluşturuldu", "kaydedildi", "tamamdır, bir şey yapmıyorum"]
+        if successMarkers.contains(where: { aLower.contains($0) }) {
+            lastSpecificInputKind = nil
+            return
+        }
+
+        // Konuşmanın hangi spesifik girdi türüyle ilgili olduğunu bul
+        var detectedKind: ManualInputKind? = nil
+        if uLower.contains("mail") || uLower.contains("e-posta") || uLower.contains("eposta") || uLower.contains("@") || aLower.contains("e-posta") || aLower.contains("mail adres") {
+            detectedKind = .email
+        } else if uLower.contains("drive") || uLower.contains("dosya") || uLower.contains("belge") || uLower.contains("pdf") || uLower.contains("tablo") || aLower.contains("drive") || aLower.contains("dosya") {
+            detectedKind = .driveFile
+        } else if uLower.contains("sms") || uLower.contains("mesaj at") || uLower.contains("rehber") || uLower.contains("numara") || aLower.contains("rehber") || aLower.contains("telefon numara") {
+            detectedKind = .phoneOrName
+        }
+
+        let effectiveKind = detectedKind ?? lastSpecificInputKind
+
+        // 1) Kullanıcı Gismo'nun 1. denemede algıladığı adresi/dosyayı/kişiyi reddettiyse ("hayır yanlış", "o adres değil", "yanlış anladın", "hiçbiri değil")
+        let userRejectionMarkers = [
+            "yanlış", "yanlis", "hayır o değil", "hayır değil", "o adres değil",
+            "o dosya değil", "öyle değil", "hatalı", "anlamadın", "anlayamadın",
+            "hiçbiri", "yazayım", "yazarak", "el ile"
+        ]
+        if let kind = effectiveKind, userRejectionMarkers.contains(where: { uLower.contains($0) }) {
+            let suggestions = kind == .driveFile ? GoogleDriveService.shared.lastSuggestedFiles.map { $0.name } : []
+            presentManualInput(
+                ManualInputPrompt(
+                    kind: kind,
+                    title: kind.defaultTitle,
+                    subtitle: "Sesli algılamada karışıklık oldu. Lütfen doğru bilgiyi aşağıya el ile yazın:",
+                    placeholder: kind.defaultPlaceholder,
+                    initialText: "",
+                    suggestions: suggestions
+                )
+            )
+            lastSpecificInputKind = nil
+            return
+        }
+
+        // 2) Kullanıcı 1. denemede spesifik bir girdi söyledi ama Gismo "bulamadım / anlayamadım / tekrar söyler misin / geçerli bir adres değil" dediyse
+        let assistantFailureMarkers = [
+            "anlayamadım", "anlaşılamadı", "bulamadım", "bulunamadı",
+            "tekrar söyler misin", "geçerli bir e-posta", "adresi tam",
+            "rehberde yok", "eşleşen dosya yok"
+        ]
+        if let kind = effectiveKind, assistantFailureMarkers.contains(where: { aLower.contains($0) }) {
+            let suggestions = kind == .driveFile ? GoogleDriveService.shared.lastSuggestedFiles.map { $0.name } : []
+            presentManualInput(
+                ManualInputPrompt(
+                    kind: kind,
+                    title: kind.defaultTitle,
+                    subtitle: "1. sesli denemede bilgi tam eşleşmedi. Aşağıdaki kutuya el ile yazabilirsiniz:",
+                    placeholder: kind.defaultPlaceholder,
+                    initialText: "",
+                    suggestions: suggestions
+                )
+            )
+            lastSpecificInputKind = nil
+            return
+        }
+
+        // 3) Önceki turda zaten aynı spesifik girdi sorulmuştu (1. deneme yapıldı) ve Gismo hâlâ "hangi adrese / hangi dosyayı / kime" diye tekrar soruyorsa
+        let stillAskingMarkers = [
+            "hangi adres", "hangi e-posta", "e-posta adresi nedir",
+            "hangi dosya", "dosyanın adı", "kime göndermek", "numarası nedir"
+        ]
+        if let prevKind = lastSpecificInputKind,
+           stillAskingMarkers.contains(where: { aLower.contains($0) }) {
+            let suggestions = prevKind == .driveFile ? GoogleDriveService.shared.lastSuggestedFiles.map { $0.name } : []
+            presentManualInput(
+                ManualInputPrompt(
+                    kind: prevKind,
+                    title: prevKind.defaultTitle,
+                    subtitle: "Sesle algılanamadı. Lütfen bilgiyi aşağıya el ile girin:",
+                    placeholder: prevKind.defaultPlaceholder,
+                    initialText: "",
+                    suggestions: suggestions
+                )
+            )
+            lastSpecificInputKind = nil
+            return
+        }
+
+        lastSpecificInputKind = detectedKind
     }
 
     func speakDemoGreeting() {

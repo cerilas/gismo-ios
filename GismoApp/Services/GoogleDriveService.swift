@@ -14,6 +14,9 @@ final class GoogleDriveService {
         let modifiedTime: String
     }
 
+    /// Son aramada önerilen benzer dosyalar ("birincisi", "ikincisi" veya kısa isimle seçim için)
+    private(set) var lastSuggestedFiles: [DriveFileItem] = []
+
     private func getValidAccessToken() async throws -> String {
         guard let user = await GoogleAuthService.shared.currentUser else {
             throw NSError(
@@ -161,19 +164,240 @@ final class GoogleDriveService {
     }
 
     func searchFiles(query: String) async throws -> String {
-        let items = try await fetchDriveFiles(query: query, pageSize: 8)
-        if items.isEmpty {
-            return query.isEmpty
-                ? "Google Drive'ında henüz hiç dosya bulunamadı."
-                : "Google Drive'da '\(query)' aramasına uygun dosya bulamadım."
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let isListAll = trimmed.isEmpty || trimmed == "*" || ["hepsi", "tümü", "son", "son dosyalar"].contains(trimmed.lowercased())
+
+        if isListAll {
+            let items = try await fetchDriveFiles(query: "", pageSize: 8)
+            guard !items.isEmpty else {
+                return "Google Drive'ında henüz hiç dosya bulunamadı."
+            }
+            lastSuggestedFiles = items
+            var resultText = "Google Drive Son Dosyalar (\(items.count) sonuç):\n"
+            for (index, item) in items.enumerated() {
+                let readableType = Self.humanReadableMimeType(item.mimeType)
+                resultText += "\(index + 1). İsim: \(item.name) | ID: \(item.id) | Tür: \(readableType)\n"
+            }
+            return resultText
         }
 
-        var resultText = "Google Drive Dosyaları (\(items.count) sonuç):\n"
-        for (index, item) in items.enumerated() {
-            let readableType = Self.humanReadableMimeType(item.mimeType)
-            resultText += "\(index + 1). İsim: \(item.name) | ID: \(item.id) | Tür: \(readableType)\n"
+        let (exactMatch, similarFiles, recentFiles) = try await findBestAndSimilarFiles(query: trimmed, limit: 5)
+
+        if let exact = exactMatch, similarFiles.count <= 1 {
+            lastSuggestedFiles = [exact]
+            let readableType = Self.humanReadableMimeType(exact.mimeType)
+            return "Google Drive'da aranan dosya bulundu:\n1. İsim: \(exact.name) | ID: \(exact.id) | Tür: \(readableType)"
         }
-        return resultText
+
+        if !similarFiles.isEmpty {
+            lastSuggestedFiles = similarFiles
+            var resultText = "[BENZER DRIVE DOSYALARI BULUNDU]\nAranan: '\(trimmed)' — Birebir aynı isim yerine Drive'da şu benzer dosyalar bulundu (\(similarFiles.count) adet):\n"
+            for (index, item) in similarFiles.enumerated() {
+                let readableType = Self.humanReadableMimeType(item.mimeType)
+                resultText += "\(index + 1). İsim: \(item.name) | ID: \(item.id) | Tür: \(readableType)\n"
+            }
+            resultText += "Lütfen kullanıcıya bu benzer dosya isimlerini söyleyip 'Şu dosya mı yoksa bu dosya mı?' diye sor."
+            return resultText
+        }
+
+        if !recentFiles.isEmpty {
+            let topRecent = Array(recentFiles.prefix(4))
+            lastSuggestedFiles = topRecent
+            var resultText = "[DRIVE DOSYASI BULUNAMADI]\nGoogle Drive'da '\(trimmed)' adına benzer bir dosya bulunamadı. Ancak Drive'daki son dosyalar şunlar:\n"
+            for (index, item) in topRecent.enumerated() {
+                let readableType = Self.humanReadableMimeType(item.mimeType)
+                resultText += "\(index + 1). İsim: \(item.name) | ID: \(item.id) | Tür: \(readableType)\n"
+            }
+            return resultText
+        }
+
+        return "[DRIVE DOSYASI BULUNAMADI] Google Drive'da '\(trimmed)' aramasına uygun hiçbir dosya bulunamadı."
+    }
+
+    // MARK: - Akıllı Bulanık (Fuzzy) Dosya Eşleştirme ve Benzer Dosya Bulucu
+
+    /// Kullanıcının sesli söylediği dosya adını (birebir tutmasa bile) Türkçe normalize edilmiş kelime kökü ve karakter benzerliği ile Drive dosyaları arasında arar.
+    func findBestAndSimilarFiles(query: String, limit: Int = 5) async throws -> (exactMatch: DriveFileItem?, similarFiles: [DriveFileItem], allRecentFiles: [DriveFileItem]) {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // 1. Kullanıcı "birincisi", "ikincisi", "ilk dosya" dediyse son önerilenlerden çöz
+        if let ordinalMatch = resolveOrdinalSelection(from: trimmed), !lastSuggestedFiles.isEmpty {
+            return (ordinalMatch, [ordinalMatch], lastSuggestedFiles)
+        }
+
+        // 2. Hem doğrudan sorguyu hem de kullanıcının son 50 Drive dosyasını çekip birleştir
+        async let directFetch = (try? fetchDriveFiles(query: trimmed, pageSize: 12)) ?? []
+        async let recentFetch = (try? fetchDriveFiles(query: "", pageSize: 50)) ?? []
+
+        let directItems = await directFetch
+        let recentItems = await recentFetch
+
+        var seenIds = Set<String>()
+        var pool: [DriveFileItem] = []
+        for item in (directItems + recentItems + lastSuggestedFiles) {
+            if !seenIds.contains(item.id) {
+                seenIds.insert(item.id)
+                pool.append(item)
+            }
+        }
+
+        guard !pool.isEmpty else {
+            return (nil, [], [])
+        }
+
+        // 3. Her dosyayı bulanık benzerlik (Fuzzy Similarity) ile puanla
+        let scored: [(file: DriveFileItem, score: Double)] = pool.map { file in
+            let s = Self.similarityScore(query: trimmed, fileName: file.name)
+            return (file, s)
+        }.sorted { $0.score > $1.score }
+
+        guard let best = scored.first else {
+            return (nil, [], recentItems)
+        }
+
+        let secondScore = scored.count > 1 ? scored[1].score : 0.0
+
+        // Tek ve çok net bir eşleşme varsa exactMatch olarak döndür
+        let isClearExactMatch = (best.score >= 0.92 && (best.score - secondScore >= 0.12))
+            || (best.score >= 0.98 && secondScore < 0.95)
+
+        let similar = scored
+            .filter { $0.score >= 0.28 }
+            .prefix(limit)
+            .map { $0.file }
+
+        if isClearExactMatch {
+            return (best.file, similar.isEmpty ? [best.file] : similar, recentItems)
+        }
+
+        return (nil, similar, recentItems)
+    }
+
+    private func resolveOrdinalSelection(from raw: String) -> DriveFileItem? {
+        let norm = Self.normalizeText(raw)
+        guard !lastSuggestedFiles.isEmpty else { return nil }
+        if norm == "1" || norm.contains("birinci") || norm.contains("ilk dosya") || norm == "ilki" {
+            return lastSuggestedFiles.first
+        }
+        if (norm == "2" || norm.contains("ikinci")) && lastSuggestedFiles.count >= 2 {
+            return lastSuggestedFiles[1]
+        }
+        if (norm == "3" || norm.contains("ucuncu")) && lastSuggestedFiles.count >= 3 {
+            return lastSuggestedFiles[2]
+        }
+        if (norm == "4" || norm.contains("dorduncu")) && lastSuggestedFiles.count >= 4 {
+            return lastSuggestedFiles[3]
+        }
+        return nil
+    }
+
+    static func normalizeText(_ text: String) -> String {
+        let map: [Character: String] = [
+            "ı": "i", "İ": "i", "I": "i",
+            "ş": "s", "Ş": "s",
+            "ğ": "g", "Ğ": "g",
+            "ü": "u", "Ü": "u",
+            "ö": "o", "Ö": "o",
+            "ç": "c", "Ç": "c"
+        ]
+        var converted = ""
+        for ch in text {
+            if let rep = map[ch] {
+                converted.append(rep)
+            } else {
+                converted.append(ch.lowercased())
+            }
+        }
+        let cleaned = converted.replacingOccurrences(
+            of: "[^a-z0-9\\s]",
+            with: " ",
+            options: .regularExpression
+        )
+        return cleaned
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func stripStopWords(_ normalized: String) -> String {
+        let stopWords: Set<String> = [
+            "drive", "drivedan", "drivedaki", "google", "dosya", "dosyasi", "dosyasini",
+            "dosyayi", "dosyalar", "belge", "belgesi", "belgesini", "dokuman", "dokumani",
+            "tablo", "tabloyu", "pdf", "txt", "klasor", "isimli", "adli", "adindaki",
+            "olan", "bul", "ac", "oku", "ozetle", "gonder", "bana", "su", "bu"
+        ]
+        let tokens = normalized.split(separator: " ").map(String.init).filter { !stopWords.contains($0) }
+        return tokens.isEmpty ? normalized : tokens.joined(separator: " ")
+    }
+
+    static func similarityScore(query: String, fileName: String) -> Double {
+        let baseFileName: String
+        if let dotIdx = fileName.lastIndex(of: "."), dotIdx != fileName.startIndex {
+            baseFileName = String(fileName[..<dotIdx])
+        } else {
+            baseFileName = fileName
+        }
+
+        let qRawNorm = normalizeText(query)
+        let qNorm = stripStopWords(qRawNorm)
+        let fNorm = normalizeText(baseFileName)
+
+        guard !qNorm.isEmpty, !fNorm.isEmpty else { return 0.0 }
+
+        if qNorm == fNorm || qRawNorm == fNorm {
+            return 1.0
+        }
+
+        if fNorm.contains(qNorm) || qNorm.contains(fNorm) {
+            let ratio = Double(min(qNorm.count, fNorm.count)) / Double(max(1, max(qNorm.count, fNorm.count)))
+            return 0.84 + (0.14 * ratio)
+        }
+
+        let qTokens = qNorm.split(separator: " ").map(String.init)
+        let fTokens = fNorm.split(separator: " ").map(String.init)
+
+        var tokenScoreSum = 0.0
+        for qt in qTokens {
+            var bestForToken = 0.0
+            for ft in fTokens {
+                if qt == ft {
+                    bestForToken = max(bestForToken, 1.0)
+                } else if qt.count >= 3 && ft.count >= 3 && (ft.hasPrefix(qt) || qt.hasPrefix(ft)) {
+                    bestForToken = max(bestForToken, 0.90)
+                } else {
+                    let dice = diceBigramSimilarity(qt, ft)
+                    bestForToken = max(bestForToken, dice)
+                }
+            }
+            tokenScoreSum += bestForToken
+        }
+
+        let avgTokenScore = qTokens.isEmpty ? 0.0 : (tokenScoreSum / Double(qTokens.count))
+        let wholeDice = diceBigramSimilarity(qNorm, fNorm)
+
+        return max(avgTokenScore * 0.88, wholeDice * 0.85, (avgTokenScore * 0.65 + wholeDice * 0.35))
+    }
+
+    private static func diceBigramSimilarity(_ a: String, _ b: String) -> Double {
+        let s1 = a.replacingOccurrences(of: " ", with: "")
+        let s2 = b.replacingOccurrences(of: " ", with: "")
+        if s1 == s2 { return 1.0 }
+        if s1.count < 2 || s2.count < 2 { return 0.0 }
+
+        func bigrams(_ s: String) -> [String] {
+            let chars = Array(s)
+            return (0..<(chars.count - 1)).map { String([chars[$0], chars[$0 + 1]]) }
+        }
+
+        let b1 = bigrams(s1)
+        var b2 = bigrams(s2)
+        var intersection = 0
+        for bg in b1 {
+            if let idx = b2.firstIndex(of: bg) {
+                intersection += 1
+                b2.remove(at: idx)
+            }
+        }
+        return (2.0 * Double(intersection)) / Double(b1.count + bigrams(s2).count)
     }
 
     /// Verilen referans bir dosya ID'si mi yoksa dosya adı mı kontrol eder; dosya adıysa Drive'da arayıp gerçek ID'sini bulur.
@@ -183,25 +407,18 @@ final class GoogleDriveService {
             throw NSError(domain: "Drive", code: 400, userInfo: [NSLocalizedDescriptionKey: "Dosya adı veya ID belirtilmedi."])
         }
 
-        // Eğer boşluk içermiyorsa ve 20+ karakterli tipik bir Drive ID gibiyse önce doğrudan dene
+        // Eğer boşluk içermiyorsa ve 18+ karakterli tipik bir Drive ID gibiyse önce doğrudan dene
         let looksLikeId = !trimmed.contains(" ") && trimmed.count >= 18 && !trimmed.contains(".")
         if looksLikeId {
             return trimmed
         }
 
-        // Dosya adına göre ara
-        let matches = try await fetchDriveFiles(query: trimmed, pageSize: 5)
-        if let first = matches.first {
-            return first.id
+        let (exactMatch, similarFiles, _) = try await findBestAndSimilarFiles(query: trimmed, limit: 5)
+        if let exact = exactMatch {
+            return exact.id
         }
-
-        // Nokta/uzantı varsa uzantısız tekrar dene
-        if let dotIndex = trimmed.lastIndex(of: ".") {
-            let baseName = String(trimmed[..<dotIndex])
-            let retryMatches = try await fetchDriveFiles(query: baseName, pageSize: 5)
-            if let first = retryMatches.first {
-                return first.id
-            }
+        if similarFiles.count == 1, let only = similarFiles.first, Self.similarityScore(query: trimmed, fileName: only.name) >= 0.55 {
+            return only.id
         }
 
         return trimmed
@@ -210,11 +427,38 @@ final class GoogleDriveService {
     // MARK: - Read & Extract File Content (Docs, Sheets, Slides, PDF, TXT, CSV, JSON, Markdown)
 
     func readTextFile(fileId: String, fileName: String? = nil) async throws -> String {
-        let targetCandidate = !fileId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            ? fileId
-            : (fileName ?? "")
+        let cleanId = fileId.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanName = (fileName ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let targetCandidate = !cleanId.isEmpty ? cleanId : cleanName
 
-        let resolvedId = try await resolveFileId(fileIdOrName: targetCandidate)
+        let looksLikeId = !cleanId.isEmpty && !cleanId.contains(" ") && cleanId.count >= 18 && !cleanId.contains(".")
+        var resolvedId = targetCandidate
+
+        if !looksLikeId {
+            let (exactMatch, similarFiles, recentFiles) = try await findBestAndSimilarFiles(query: targetCandidate, limit: 4)
+            if let exact = exactMatch {
+                resolvedId = exact.id
+            } else if similarFiles.count == 1, let only = similarFiles.first, Self.similarityScore(query: targetCandidate, fileName: only.name) >= 0.62 {
+                resolvedId = only.id
+            } else if !similarFiles.isEmpty {
+                lastSuggestedFiles = similarFiles
+                let optionsList = similarFiles.enumerated().map { idx, item in
+                    "\(idx + 1)) \(item.name) (ID: \(item.id))"
+                }.joined(separator: "\n")
+                return """
+                [BENZER DRIVE DOSYALARI BULUNDU - KULLANICIYA SOR]
+                '\(targetCandidate)' adıyla birebir tek bir dosya yerine şu benzer dosyalar bulundu:
+                \(optionsList)
+                Lütfen kullanıcıya bu dosya isimlerini söyleyip "Şu dosya mı yoksa bu dosya mı, hangisini okumamı istersin?" diye sor. Kullanıcı seçtiğinde ilgili dosyanın ID'si ile `readDriveFile` aracını çağır.
+                """
+            } else {
+                if !recentFiles.isEmpty {
+                    let topRecent = Array(recentFiles.prefix(3))
+                    lastSuggestedFiles = topRecent
+                }
+                throw NSError(domain: "Drive", code: 404, userInfo: [NSLocalizedDescriptionKey: "Drive'da '\(targetCandidate)' ismine benzer bir dosya bulunamadı."])
+            }
+        }
 
         let data: Data
         let mimeType: String

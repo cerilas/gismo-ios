@@ -295,6 +295,32 @@ struct GismoFaceView: View {
                                 }
                                 .buttonStyle(ScaleButtonStyle())
 
+                                // Klavye / Manuel Metin Giriş Butonu (1. sesli deneme başarısız olduğunda otomatik açılır, istenirse buradan da açılabilir)
+                                Button {
+                                    vm.openManualInputFromHUD()
+                                } label: {
+                                    Image(systemName: "keyboard.fill")
+                                        .font(.system(size: 13, weight: .bold))
+                                        .foregroundColor(vm.activeManualInputPrompt != nil ? emotion.primary : .white.opacity(0.8))
+                                        .frame(width: 40, height: 40)
+                                        .background(
+                                            Circle()
+                                                .fill(
+                                                    vm.activeManualInputPrompt != nil
+                                                        ? emotion.primary.opacity(0.18)
+                                                        : Color.black.opacity(0.38)
+                                                )
+                                                .overlay(
+                                                    Circle()
+                                                        .stroke(
+                                                            vm.activeManualInputPrompt != nil ? emotion.primary.opacity(0.7) : Color.white.opacity(0.12),
+                                                            lineWidth: 1
+                                                        )
+                                                )
+                                        )
+                                }
+                                .buttonStyle(ScaleButtonStyle())
+
                                 Spacer()
 
                                 // Sağ üst: Duygu & Robot Durum Rozeti
@@ -483,6 +509,19 @@ struct GismoFaceView: View {
                     }
                     .transition(.opacity.combined(with: .scale(scale: 0.92)))
                     .zIndex(10)
+                }
+
+                // 1. sesli denemeden sonra başarısız olunduğunda açılan Manuel Metin Giriş Kutusu
+                if let prompt = vm.activeManualInputPrompt, vm.isRobotBodyOnline {
+                    ManualInputOverlayView(
+                        prompt: prompt,
+                        text: $vm.manualInputText,
+                        accentColor: emotion.primary,
+                        onSubmit: { val in vm.submitManualInput(val) },
+                        onCancel: { vm.dismissManualInput() }
+                    )
+                    .transition(.opacity.combined(with: .scale(scale: 0.94)))
+                    .zIndex(15)
                 }
 
                 // Robot gövdesi kapandığında / bağlantı koptuğunda kapanma animasyonu ve kilit ekranı
@@ -2243,6 +2282,169 @@ struct RobotBodyPowerOffOverlay: View {
             }
             withAnimation(.easeInOut(duration: 1.1).repeatForever(autoreverses: true)) {
                 pulseGlow = true
+            }
+        }
+    }
+}
+
+// MARK: - Manuel Metin Giriş Kutusu (1. Sesli Deneme Başarısız Olduğunda Açılır)
+
+private struct ManualInputOverlayView: View {
+    let prompt: ManualInputPrompt
+    @Binding var text: String
+    let accentColor: Color
+    let onSubmit: (String?) -> Void
+    let onCancel: () -> Void
+
+    @FocusState private var isFieldFocused: Bool
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.68)
+                .ignoresSafeArea()
+                .onTapGesture {
+                    onCancel()
+                }
+
+            VStack(spacing: 12) {
+                // Başlık Satırı
+                HStack(spacing: 10) {
+                    Image(systemName: prompt.kind.iconName)
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundColor(accentColor)
+                        .frame(width: 34, height: 34)
+                        .background(
+                            Circle()
+                                .fill(accentColor.opacity(0.16))
+                                .overlay(Circle().stroke(accentColor.opacity(0.45), lineWidth: 1))
+                        )
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(prompt.title)
+                            .font(.system(size: 13, weight: .black, design: .monospaced))
+                            .tracking(0.8)
+                            .foregroundColor(.white)
+
+                        Text(prompt.subtitle)
+                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                            .foregroundColor(.white.opacity(0.68))
+                            .lineLimit(2)
+                    }
+
+                    Spacer()
+
+                    Button(action: onCancel) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(.white.opacity(0.75))
+                            .frame(width: 30, height: 30)
+                            .background(Circle().fill(Color.white.opacity(0.10)))
+                    }
+                }
+
+                // Varsa Drive benzer / son dosya önerileri (tek dokunuşla seçim)
+                if !prompt.suggestions.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(prompt.suggestions, id: \.self) { suggestion in
+                                Button {
+                                    text = suggestion
+                                    onSubmit(suggestion)
+                                } label: {
+                                    HStack(spacing: 5) {
+                                        Image(systemName: "doc.text.fill")
+                                            .font(.system(size: 11))
+                                        Text(suggestion)
+                                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                            .lineLimit(1)
+                                    }
+                                    .foregroundColor(accentColor)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background(
+                                        Capsule()
+                                            .fill(accentColor.opacity(0.15))
+                                            .overlay(
+                                                Capsule()
+                                                    .stroke(accentColor.opacity(0.45), lineWidth: 1)
+                                            )
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Metin Giriş Alanı + Gönder Butonu
+                HStack(spacing: 10) {
+                    TextField(prompt.placeholder, text: $text)
+                        .focused($isFieldFocused)
+                        .keyboardType(prompt.kind == .email ? .emailAddress : .default)
+                        .textInputAutocapitalization(prompt.kind == .email ? .never : .sentences)
+                        .autocorrectionDisabled(true)
+                        .submitLabel(.send)
+                        .onSubmit {
+                            onSubmit(nil)
+                        }
+                        .font(.system(size: 15, weight: .semibold, design: .rounded))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 11)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .fill(Color.white.opacity(0.08))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                        .stroke(accentColor.opacity(0.55), lineWidth: 1.2)
+                                )
+                        )
+
+                    Button {
+                        onSubmit(nil)
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "paperplane.fill")
+                                .font(.system(size: 13, weight: .bold))
+                            Text("GÖNDER")
+                                .font(.system(size: 12, weight: .black, design: .monospaced))
+                        }
+                        .foregroundColor(.black)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .fill(accentColor)
+                        )
+                    }
+                    .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .opacity(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.45 : 1.0)
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
+            .frame(maxWidth: 520)
+            .background(
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .fill(Color(hex: "0B0E1A").opacity(0.96))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 24, style: .continuous)
+                            .stroke(
+                                LinearGradient(
+                                    colors: [accentColor.opacity(0.75), Color.white.opacity(0.15)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 1.4
+                            )
+                    )
+                    .shadow(color: accentColor.opacity(0.28), radius: 22, x: 0, y: 8)
+            )
+            .padding(.horizontal, 24)
+            .padding(.top, 8)
+        }
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                isFieldFocused = true
             }
         }
     }
