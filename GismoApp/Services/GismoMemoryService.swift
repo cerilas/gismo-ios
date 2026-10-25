@@ -120,8 +120,8 @@ final class GismoMemoryService: @unchecked Sendable {
         let cleanCategory = ["owner", "person", "topic", "note"].contains(category.lowercased())
             ? category.lowercased()
             : "note"
-        let cleanSubject = subject.trimmingCharacters(in: .whitespacesAndNewlines)
-        let cleanContent = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanSubject = String(subject.trimmingCharacters(in: .whitespacesAndNewlines).prefix(80))
+        let cleanContent = String(content.trimmingCharacters(in: .whitespacesAndNewlines).prefix(240))
 
         lock.lock()
         let savedItem: GismoMemoryItem
@@ -144,8 +144,9 @@ final class GismoMemoryService: @unchecked Sendable {
                 updatedAt: Date()
             )
             items.insert(newItem, at: 0)
-            if items.count > 120 {
-                items = Array(items.prefix(120))
+            // Yerel önbellekte en güncel 300 kaydı tut (tüm geçmiş PostgreSQL'de korunur)
+            if items.count > 300 {
+                items = Array(items.prefix(300))
             }
             savedItem = newItem
         }
@@ -199,50 +200,55 @@ final class GismoMemoryService: @unchecked Sendable {
         return removed
     }
 
-    // MARK: - Prompt Context (Injected into Gemini & Gemini Live)
+    // MARK: - Prompt Context (L1 Sabit Bütçeli Özet + L2 Derin Arşiv Arama)
 
+    /// Hafızada binlerce kayıt olsa bile sistemin ASLA yavaşlamaması için:
+    /// - Prompt içine yalnızca en güncel/çekirdek kayıtlar (maksimum ~1.800 karakter / ~350 token bütçesiyle) eklenir.
+    /// - Daha eski kayıtlar prompt'u şişirmez; Gismo ihtiyaç duyduğunda `recallMemories(query:)` aracıyla arşivden arar.
     func promptContext() -> String {
         seedOwnerFromAuthIfNeeded()
         lock.lock()
         let snapshot = items
         lock.unlock()
 
-        let ownerFacts  = snapshot.filter { $0.category == "owner" }.prefix(15)
-        let peopleFacts = snapshot.filter { $0.category == "person" }.prefix(20)
-        let notes       = snapshot.filter { $0.category == "note" }.prefix(20)
-        let topics      = snapshot.filter { $0.category == "topic" }.prefix(12)
+        let ownerFacts  = Array(snapshot.filter { $0.category == "owner" }.prefix(8))
+        let peopleFacts = Array(snapshot.filter { $0.category == "person" }.prefix(10))
+        let notes       = Array(snapshot.filter { $0.category == "note" }.prefix(10))
+        let topics      = Array(snapshot.filter { $0.category == "topic" }.prefix(6))
+
+        let includedCount = ownerFacts.count + peopleFacts.count + notes.count + topics.count
+        let archivedExtraCount = max(0, snapshot.count - includedCount)
 
         var lines: [String] = [
             "KALICI HAFIZA (BELLEK) SİSTEMİ:",
             "- Sahibini, konuştuğunuz konuları, tanıştığın kişileri ve 'bunu aklında tut / unutma' denilen her şeyi kalıcı hafızanda tutarsın.",
-            "- Kullanıcı sana kendisiyle ilgili bir bilgi söylediğinde (`category: 'owner'`), bir kişiyi tanıttığında veya birinden bahsettiğinde (`category: 'person'`), önemli bir konudan konuştuğunuzda (`category: 'topic'`) ya da 'bunu aklında tut / unutma / hafızana kaydet' dediğinde (`category: 'note'`) `saveMemory` aracını çağırarak kalıcı hafızaya kaydet.",
-            "- Kullanıcı geçmişte konuştuğunuz bir konuyu, tanıdığı birini veya kendisiyle ilgili bir detayı sorduğunda aşağıdaki KALICI HAFIZA kayıtlarını kullan (gerekirse `recallMemories` aracını çağır).",
+            "- Kullanıcı sana kendisiyle ilgili bir bilgi söylediğinde (`category: 'owner'`), bir kişiyi tanıttığında (`category: 'person'`), önemli bir konudan konuştuğunuzda (`category: 'topic'`) ya da 'bunu aklında tut / unutma / hafızana kaydet' dediğinde (`category: 'note'`) `saveMemory` aracını çağır.",
+            "- Aşağıdaki listede olmayan daha eski bir kişi, konu veya not sorulursa `recallMemories` aracını çağırarak tüm hafıza arşivinde ara.",
             "- Kullanıcı 'bunu unut / hafızandan sil' derse `forgetMemory` aracını çağır."
         ]
 
-        if !ownerFacts.isEmpty {
-            lines.append("• SAHİBİN HAKKINDA BİLDİKLERİN:")
-            for item in ownerFacts {
-                lines.append("  - [\(item.subject)]: \(item.content)")
+        let maxPromptBodyChars = 1800
+        var usedChars = 0
+
+        func appendSection(title: String, list: [GismoMemoryItem]) {
+            guard !list.isEmpty, usedChars < maxPromptBodyChars else { return }
+            lines.append(title)
+            for item in list {
+                let compactContent = String(item.content.prefix(140))
+                let entry = "  - [\(item.subject)]: \(compactContent)"
+                if usedChars + entry.count > maxPromptBodyChars { break }
+                lines.append(entry)
+                usedChars += entry.count
             }
         }
-        if !peopleFacts.isEmpty {
-            lines.append("• TANIŞTIĞIN / BİLDİĞİN KİŞİLER:")
-            for item in peopleFacts {
-                lines.append("  - [\(item.subject)]: \(item.content)")
-            }
-        }
-        if !notes.isEmpty {
-            lines.append("• AKLINDA TUTMAN İSTENEN KALICI NOTLAR:")
-            for item in notes {
-                lines.append("  - [\(item.subject)]: \(item.content)")
-            }
-        }
-        if !topics.isEmpty {
-            lines.append("• ÖNCEKİ KONUŞULAN KONULAR:")
-            for item in topics {
-                lines.append("  - [\(item.subject)]: \(item.content)")
-            }
+
+        appendSection(title: "• SAHİBİN HAKKINDA BİLDİKLERİN:", list: ownerFacts)
+        appendSection(title: "• TANIŞTIĞIN / BİLDİĞİN KİŞİLER:", list: peopleFacts)
+        appendSection(title: "• AKLINDA TUTMAN İSTENEN KALICI NOTLAR:", list: notes)
+        appendSection(title: "• SON KONUŞULAN KONULAR:", list: topics)
+
+        if archivedExtraCount > 0 {
+            lines.append("• NOT: Arşivde +\(archivedExtraCount) adet daha eski hafıza kaydı var. Gerekirse `recallMemories` ile sorgula.")
         }
 
         return lines.joined(separator: "\n")

@@ -954,10 +954,8 @@ final class GeminiLiveService {
     }
 
     func ensureConnected(apiKey: String) async throws {
-        let currentMemRevision = GismoMemoryService.shared.revision
         if isConnectedAndReady,
            connectedApiKey == apiKey,
-           connectedMemoryRevision == currentMemRevision,
            let task = webSocketTask,
            task.state == .running {
             return
@@ -970,7 +968,7 @@ final class GeminiLiveService {
             do {
                 try await connectWithModel(model, apiKey: apiKey)
                 connectedApiKey = apiKey
-                connectedMemoryRevision = currentMemRevision
+                connectedMemoryRevision = GismoMemoryService.shared.revision
                 isConnectedAndReady = true
                 print("[GeminiLive] Bağlantı hazır (\(model))")
                 return
