@@ -73,11 +73,21 @@ private struct MeResponse: Decodable {
 @MainActor
 final class AuthService: ObservableObject {
     static let shared = AuthService()
+    static let robotNameDidChangeNotification = Notification.Name("GismoCustomRobotNameDidChangeNotification")
 
     @Published var currentUser: GismoUser?
     @Published var isAuthenticated: Bool = false
     @Published var isLoading: Bool = false
     @Published var errorMessage: String?
+
+    /// Kullanıcının tek seferlik onboarding ekranında robotuna verdiği isim
+    @Published var customRobotName: String = ""
+    @Published var needsRobotNamingOnboarding: Bool = false
+
+    var effectiveRobotName: String {
+        let trimmed = customRobotName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "Robot" : trimmed
+    }
 
     private let tokenKey = "gismo_auth_jwt_token"
     private let userKey  = "gismo_auth_current_user"
@@ -111,6 +121,53 @@ final class AuthService: ObservableObject {
         }
     }
 
+    private func robotNameKey(for userId: String) -> String {
+        "user_custom_robot_name_\(userId)"
+    }
+
+    func refreshCustomRobotNameState() {
+        guard let user = currentUser else {
+            customRobotName = ""
+            needsRobotNamingOnboarding = false
+            return
+        }
+        let saved = (UserDefaults.standard.string(forKey: robotNameKey(for: user.id)) ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if !saved.isEmpty {
+            customRobotName = saved
+            needsRobotNamingOnboarding = false
+            GismoMemoryService.shared.activeRobotNameOverride = saved
+        } else {
+            customRobotName = ""
+            needsRobotNamingOnboarding = true
+        }
+    }
+
+    func saveCustomRobotName(_ rawName: String) {
+        let clean = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty, let user = currentUser else { return }
+
+        UserDefaults.standard.set(clean, forKey: robotNameKey(for: user.id))
+        GismoMemoryService.shared.activeRobotNameOverride = clean
+        _ = GismoMemoryService.shared.upsertMemory(
+            category: "owner",
+            subject: "Robotun İsmi",
+            content: "Benim adım \(clean).",
+            syncRemote: true
+        )
+
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+            self.customRobotName = clean
+            self.needsRobotNamingOnboarding = false
+        }
+
+        NotificationCenter.default.post(
+            name: Self.robotNameDidChangeNotification,
+            object: nil,
+            userInfo: ["name": clean]
+        )
+    }
+
     func loadSavedSession() {
         if let token = authToken, !token.isEmpty,
            let data = UserDefaults.standard.data(forKey: userKey),
@@ -118,12 +175,17 @@ final class AuthService: ObservableObject {
             applyReviewerDemoModeIfNeeded(for: savedUser)
             self.currentUser = savedUser
             self.isAuthenticated = true
+            refreshCustomRobotNameState()
+            GismoMemoryService.shared.reloadForCurrentUser()
             Task {
                 await refreshProfile()
             }
         } else {
             self.currentUser = nil
             self.isAuthenticated = false
+            self.customRobotName = ""
+            self.needsRobotNamingOnboarding = false
+            GismoMemoryService.shared.reloadForCurrentUser()
         }
     }
 
@@ -133,8 +195,10 @@ final class AuthService: ObservableObject {
             UserDefaults.standard.set(encoded, forKey: userKey)
         }
         applyReviewerDemoModeIfNeeded(for: user)
+        self.currentUser = user
+        refreshCustomRobotNameState()
+        GismoMemoryService.shared.reloadForCurrentUser()
         withAnimation(.spring(response: 0.4, dampingFraction: 0.82)) {
-            self.currentUser = user
             self.isAuthenticated = true
             self.errorMessage = nil
         }
@@ -408,9 +472,13 @@ final class AuthService: ObservableObject {
         authToken = nil
         UserDefaults.standard.removeObject(forKey: userKey)
         GoogleAuthService.shared.signOut()
+        GismoMemoryService.shared.activeRobotNameOverride = nil
+        GismoMemoryService.shared.reloadForCurrentUser()
         withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
             self.currentUser = nil
             self.isAuthenticated = false
+            self.customRobotName = ""
+            self.needsRobotNamingOnboarding = false
             self.errorMessage = nil
         }
     }
@@ -426,7 +494,10 @@ final class AuthService: ObservableObject {
         req.timeoutInterval = 12
 
         _ = try? await URLSession.shared.data(for: req)
-        UserDefaults.standard.removeObject(forKey: "gismo_permanent_memories_v1")
+        if let uid = currentUser?.id {
+            UserDefaults.standard.removeObject(forKey: robotNameKey(for: uid))
+        }
+        GismoMemoryService.shared.clearCurrentUserLocalMemories()
         signOut()
     }
 

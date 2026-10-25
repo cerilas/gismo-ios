@@ -7,6 +7,8 @@ class RobotListViewModel: ObservableObject {
     @Published var errorMessage: String?
     private var loadTask: Task<Void, Never>?
     private var robotsObserver: NSObjectProtocol?
+    private var nameObserver: NSObjectProtocol?
+    private static let demoRobotID = UUID(uuidString: "00000000-0000-0000-0000-000000002423")!
 
     init() {
         WebSocketService.shared.connect()
@@ -17,7 +19,18 @@ class RobotListViewModel: ObservableObject {
         ) { [weak self] notification in
             guard let robots = notification.userInfo?["robots"] as? [Robot] else { return }
             Task { @MainActor in
-                self?.robots = robots
+                guard let self else { return }
+                self.robots = self.applyUserRobotName(to: robots)
+            }
+        }
+        nameObserver = NotificationCenter.default.addObserver(
+            forName: AuthService.robotNameDidChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                guard let self else { return }
+                self.robots = self.applyUserRobotName(to: self.robots, forceSyncToServer: true)
             }
         }
     }
@@ -26,6 +39,53 @@ class RobotListViewModel: ObservableObject {
         if let robotsObserver {
             NotificationCenter.default.removeObserver(robotsObserver)
         }
+        if let nameObserver {
+            NotificationCenter.default.removeObserver(nameObserver)
+        }
+    }
+
+    private func applyUserRobotName(to rawList: [Robot], forceSyncToServer: Bool = false) -> [Robot] {
+        let customName = AuthService.shared.customRobotName.trimmingCharacters(in: .whitespacesAndNewlines)
+        var list = rawList
+
+        if !customName.isEmpty {
+            for idx in list.indices {
+                let current = list[idx].name.trimmingCharacters(in: .whitespacesAndNewlines)
+                let isDefaultName = current.isEmpty
+                    || current.lowercased().hasPrefix("gismo")
+                    || current.lowercased() == "robot"
+                if idx == 0 || isDefaultName {
+                    if list[idx].name != customName {
+                        list[idx].name = customName
+                        let updated = list[idx]
+                        if updated.id != Self.demoRobotID {
+                            Task {
+                                try? await DatabaseService.shared.registerRobot(updated)
+                            }
+                        }
+                    } else if forceSyncToServer && list[idx].id != Self.demoRobotID {
+                        let updated = list[idx]
+                        Task {
+                            try? await DatabaseService.shared.registerRobot(updated)
+                        }
+                    }
+                }
+            }
+        }
+
+        if list.isEmpty && UserDefaults.standard.bool(forKey: "isTestModeEnabled") {
+            list = [
+                Robot(
+                    id: Self.demoRobotID,
+                    name: AuthService.shared.effectiveRobotName,
+                    ipAddress: "192.168.4.1",
+                    lastSeen: Date(),
+                    isOnline: true
+                )
+            ]
+        }
+
+        return list
     }
 
     func loadRobots() async {
@@ -39,7 +99,7 @@ class RobotListViewModel: ObservableObject {
                 let fetched = try await DatabaseService.shared.fetchRobots()
                 guard !Task.isCancelled else { return }
 
-                robots = fetched
+                robots = applyUserRobotName(to: fetched)
                 isLoading = false
             } catch is CancellationError {
                 finishCancelledLoad()
@@ -51,7 +111,12 @@ class RobotListViewModel: ObservableObject {
                     return
                 }
 
-                errorMessage = error.localizedDescription
+                if UserDefaults.standard.bool(forKey: "isTestModeEnabled") {
+                    robots = applyUserRobotName(to: [])
+                    errorMessage = nil
+                } else {
+                    errorMessage = error.localizedDescription
+                }
                 isLoading = false
             }
         }
@@ -65,16 +130,24 @@ class RobotListViewModel: ObservableObject {
     }
 
     func addRobot(_ robot: Robot) {
-        if let index = robots.firstIndex(where: { $0.id == robot.id }) {
-            robots[index] = robot
+        var added = robot
+        let trimmed = added.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty || trimmed.lowercased().hasPrefix("gismo") {
+            added.name = AuthService.shared.effectiveRobotName
         } else {
-            robots.append(robot)
+            AuthService.shared.saveCustomRobotName(trimmed)
+        }
+
+        if let index = robots.firstIndex(where: { $0.id == added.id }) {
+            robots[index] = added
+        } else {
+            robots.append(added)
         }
 
         // Arka planda veritabanına kaydet
         Task {
             do {
-                try await DatabaseService.shared.registerRobot(robot)
+                try await DatabaseService.shared.registerRobot(added)
             } catch {
                 print("Robot kaydetme hatası: \(error)")
             }

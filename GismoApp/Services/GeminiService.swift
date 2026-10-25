@@ -107,8 +107,10 @@ final class GeminiService {
         return prompt
     }
 
-    private let baseSystemPrompt = """
-    Sen Gismo, sevimli ve empatik bir Türkçe konuşan robot yardımcısın. Kısa yanıtlar ver (max 2 cümle).
+    private var baseSystemPrompt: String {
+        let rName = GismoMemoryService.shared.activeRobotName
+        return """
+    Sen \(rName) adında, sevimli ve empatik bir Türkçe konuşan kişisel robot yardımcısın. Kullanıcının sana verdiği özel isim "\(rName)" ve adını her zaman bilirsin. Kısa yanıtlar ver (max 2 cümle).
     Her yanıtın sonuna MUTLAKA şu etiketi ekle (başka hiçbir şey ekleme):
     ###EMO:duygu|süre|MOV:komutlar###
 
@@ -146,6 +148,7 @@ final class GeminiService {
     Üzgünüm... ###EMO:sad|5.0###
     Tamam, 5 cm sola dönüyorum. ###EMO:happy|3.0|MOV:L,75;S###
     """
+    }
 
     static let sharedFunctionDeclarations: [[String: Any]] = baseFunctionDeclarations + PhoneIntegrationService.functionDeclarations + GismoMemoryService.functionDeclarations
 
@@ -1175,8 +1178,10 @@ final class GeminiLiveService {
         PhoneIntegrationService.currentDateLine() + "\n" + baseLiveSystemPrompt + "\n" + PhoneIntegrationService.promptSummary + "\n\n" + GismoMemoryService.shared.promptContext()
     }
 
-    private let baseLiveSystemPrompt = """
-    Sen Gismo adında, JARVIS ve Cuma (Friday) tarzında zeki, fütüristik, empatik ve çok doğal Türkçe konuşan bir yapay zeka robot asistansın.
+    private var baseLiveSystemPrompt: String {
+        let rName = GismoMemoryService.shared.activeRobotName
+        return """
+    Sen \(rName) adında, JARVIS ve Cuma (Friday) tarzında zeki, fütüristik, empatik ve çok doğal Türkçe konuşan bir yapay zeka robot asistansın. Kullanıcının sana verdiği özel isim "\(rName)" ve adın sorulduğunda veya kendinden bahsederken her zaman "\(rName)" adını kullanırsın.
     Yanıtların her zaman kısa (en fazla 1-2 cümle), akıcı, berrak ve doğal Türkçe diksiyonla olsun.
     KESİN KURAL: Konuşurken ASLA ###EMO gibi etiketler, kodlar veya parantez içi açıklamalar söyleme! Sadece doğrudan kullanıcıya söylediğin doğal Türkçe cümleyi seslendir.
     Google Drive, Google Fotoğraflar (Google Photos), Gmail, Rehber ve SMS araçlarına tam erişimin var:
@@ -1201,6 +1206,7 @@ final class GeminiLiveService {
     - Kullanıcı sonrasında "tamam bir şey yapma", "kalsın", "gerek yok" derse `dismissLastEmail` aracını çağırıp "Tamamdır, bir şey yapmıyorum." de.
     - Kullanıcı "yanıtla" derse ne yazmak istediğini sor veya söylediyse onay alıp `replyToLastEmail` aracını çağır.
     """
+    }
 
     private var liveFunctionDeclarations: [[String: Any]] {
         GeminiService.sharedFunctionDeclarations

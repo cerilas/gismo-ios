@@ -76,8 +76,8 @@ struct AIKeySheet: View {
                                 .font(.system(size: 26, weight: .black, design: .rounded))
                                 .foregroundColor(.white)
                             Text(isGate
-                                 ? "Gismo'nun yüz ve sesli asistan modunu kullanabilmek için önce kendi Yapay Zeka Anahtarını girmelisin."
-                                 : "Gismo'nun konuşabilmesi, görebilmesi ve senin adına işlem yapabilmesi için Yapay Zeka Anahtarı kullanılır.")
+                                 ? "Robotunun yüz ve sesli asistan modunu kullanabilmek için önce kendi Yapay Zeka Anahtarını girmelisin."
+                                 : "Robotunun konuşabilmesi, görebilmesi ve senin adına işlem yapabilmesi için Yapay Zeka Anahtarı kullanılır.")
                                 .font(.system(size: 14, weight: .medium, design: .rounded))
                                 .foregroundColor(.gSubtext)
                                 .lineSpacing(4)

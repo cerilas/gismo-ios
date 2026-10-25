@@ -88,6 +88,7 @@ struct RobotListView: View {
             Button("Onayla") {
                 if testPassword == "2423" {
                     withAnimation { isTestModeEnabled.toggle() }
+                    Task { await viewModel.loadRobots() }
                 }
                 testPassword = ""
             }
@@ -129,21 +130,8 @@ struct RobotListView: View {
                     .shadow(color: Color.gCyan.opacity(0.8), radius: 4)
                 }
 
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 6) {
-                        Text("GISMO")
-                            .font(.system(size: 24, weight: .black, design: .rounded))
-                            .tracking(1.6)
-                            .lineLimit(1)
-                            .fixedSize(horizontal: true, vertical: false)
-                            .foregroundStyle(
-                                LinearGradient(
-                                    colors: [.white, Color.gAccent2],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-
+                if isTestModeEnabled || logoTapCount >= 3 {
+                    VStack(alignment: .leading, spacing: 3) {
                         if isTestModeEnabled {
                             Text("DEV")
                                 .font(.system(size: 9, weight: .black, design: .monospaced))
@@ -153,13 +141,13 @@ struct RobotListView: View {
                                 .background(Capsule().fill(Color.gWarning))
                                 .fixedSize()
                         }
-                    }
 
-                    Text(subtextForHeader)
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundColor(isTestModeEnabled ? .gWarning : .gSubtext)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
+                        Text(subtextForHeader)
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .foregroundColor(isTestModeEnabled ? .gWarning : .gSubtext)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                    }
                 }
             }
             .layoutPriority(1)
@@ -504,7 +492,7 @@ struct RobotListView: View {
 
                 VStack(spacing: 12) {
                     modeOptionButton(
-                        title: "Gismo AI Yüz & Sesli Asistan",
+                        title: "AI Yüz & Sesli Asistan",
                         subtitle: "Canlı konuşma, yüz takibi, kamera ve Google asistanı",
                         icon: "sparkles",
                         badge: aiKey.trimmingCharacters(in: .whitespaces).isEmpty ? "ANAHTAR GEREKLİ" : "ÖNERİLEN",
@@ -662,7 +650,7 @@ struct RobotListView: View {
                 Text("Robotlar Taranıyor")
                     .font(.system(size: 17, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
-                Text("Ağ üzerindeki Gismo üniteleri kontrol ediliyor...")
+                Text("Ağ üzerindeki robot üniteleri kontrol ediliyor...")
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(.gSubtext)
             }
@@ -739,7 +727,7 @@ struct RobotListView: View {
                 Text("Henüz Robot Eklenmedi")
                     .font(.system(size: 23, weight: .black, design: .rounded))
                     .foregroundColor(.white)
-                Text("Yeni bir Gismo ünitesini WiFi ağına bağlamak için\naşağıdaki kurulum sihirbazını başlatın.")
+                Text("Yeni bir robot ünitesini WiFi ağına bağlamak için\naşağıdaki kurulum sihirbazını başlatın.")
                     .font(.system(size: 14, weight: .medium))
                     .foregroundColor(.gSubtext)
                     .multilineTextAlignment(.center)

@@ -486,7 +486,7 @@ struct GismoFaceView: View {
                                     .fill(Color.white)
                                     .frame(width: 240, height: 44)
                                     .overlay(
-                                        Text("Gismo ile selfie 📸")
+                                        Text("\(vm.activeRobotName) ile selfie 📸")
                                             .font(.system(size: 13, weight: .medium, design: .rounded))
                                             .foregroundColor(Color(hex: "333333"))
                                     )
@@ -1330,7 +1330,7 @@ struct IntegrationsView: View {
                                 .font(.system(size: 28, weight: .black, design: .rounded))
                                 .foregroundColor(.white)
                             
-                            Text("Gismo'yu yetkilendirerek telefonunun kamerası, rehberi, takvimi, alarmları, sağlık ve konum verileriyle; ayrıca e-posta, Google Drive ve Google Fotoğraflar'ınla senin adına çalışmasını sağlayabilirsin.")
+                            Text("Robotunu yetkilendirerek telefonunun kamerası, rehberi, takvimi, alarmları, sağlık ve konum verileriyle; ayrıca e-posta, Google Drive ve Google Fotoğraflar'ınla senin adına çalışmasını sağlayabilirsin.")
                                 .font(.system(size: 14, weight: .medium, design: .rounded))
                                 .foregroundColor(.gSubtext)
                                 .lineSpacing(4)
@@ -1712,7 +1712,7 @@ struct GoogleInfoView: View {
                     
                     // Content
                     VStack(alignment: .leading, spacing: 24) {
-                        Text("Bu entegrasyon sayesinde Gismo artık sadece bir robot değil, aynı zamanda kişisel dijital asistanın haline geliyor. Google hesabını bağladığında Gismo aşağıdaki işlemleri senin adına güvenle yapabilir:")
+                        Text("Bu entegrasyon sayesinde robotun artık sadece bir robot değil, aynı zamanda kişisel dijital asistanın haline geliyor. Google hesabını bağladığında robotun aşağıdaki işlemleri senin adına güvenle yapabilir:")
                         .font(.system(size: 15))
                         .foregroundColor(.white.opacity(0.8))
                         .padding(.bottom, 10)
@@ -1736,7 +1736,7 @@ struct GoogleInfoView: View {
                     }
                     
                     VStack(alignment: .leading, spacing: 12) {
-                        ScenarioBubble(text: "\"Hey Gismo, fotoğrafımı çek ve Drive'ıma yükle.\"")
+                        ScenarioBubble(text: "\"Fotoğrafımı çek ve Drive'ıma yükle.\"")
                         ScenarioBubble(text: "\"Bugün kimden mail gelmiş, bana kısaca özetler misin?\"")
                         ScenarioBubble(text: "\"Beni çekip patrona 'Toplantıya hazırım' diye mail at.\"")
                         ScenarioBubble(text: "\"Drive'ımdaki '2026 Hesaplar' adlı dosyayı bulup bana anlatır mısın?\"")
@@ -1867,7 +1867,7 @@ struct SMSInfoView: View {
                     
                     // Content
                     VStack(alignment: .leading, spacing: 24) {
-                        Text("Gismo, Netgsm API altyapısını kullanarak arka planda hızlı ve güvenli SMS gönderimi yapabilir. Bu entegrasyon sayesinde doğrudan telefonundan veya ekrandan onay vermene gerek kalmadan Gismo senin yerine mesaj atar.")
+                        Text("Robotun, Netgsm API altyapısını kullanarak arka planda hızlı ve güvenli SMS gönderimi yapabilir. Bu entegrasyon sayesinde doğrudan telefonundan veya ekrandan onay vermene gerek kalmadan senin yerine mesaj atar.")
                             .font(.system(size: 15))
                             .foregroundColor(.white.opacity(0.8))
                             .lineSpacing(4)
@@ -1890,7 +1890,7 @@ struct SMSInfoView: View {
                         }
                         
                         VStack(alignment: .leading, spacing: 12) {
-                            ScenarioBubble(text: "\"Hey Gismo, anneme '10 dakika gecikeceğim' diye SMS at.\"")
+                            ScenarioBubble(text: "\"Anneme '10 dakika gecikeceğim' diye SMS at.\"")
                             ScenarioBubble(text: "\"Hakan'a mesaj at: Toplantı saat 14:00'e alındı.\"")
                             ScenarioBubble(text: "\"Eşime SMS at: Eve gelirken ekmek alacağım.\"")
                         }

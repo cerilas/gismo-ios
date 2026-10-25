@@ -167,23 +167,10 @@ struct AuthView: View {
                 .shadow(color: Color.gCyan.opacity(0.9), radius: 6)
             }
 
-            VStack(spacing: 4) {
-                Text("GISMO")
-                    .font(.system(size: 30, weight: .black, design: .rounded))
-                    .tracking(3)
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [.white, Color.gAccent2],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-
-                Text("Devam etmek için giriş yapın veya hesap oluşturun")
-                    .font(.system(size: 13, weight: .medium, design: .rounded))
-                    .foregroundColor(.gSubtext)
-                    .multilineTextAlignment(.center)
-            }
+            Text("Devam etmek için giriş yapın veya hesap oluşturun")
+                .font(.system(size: 13, weight: .medium, design: .rounded))
+                .foregroundColor(.gSubtext)
+                .multilineTextAlignment(.center)
         }
     }
 
@@ -994,5 +981,183 @@ struct UserProfileSheet: View {
                 .font(.system(size: 13, weight: .bold, design: .rounded))
                 .foregroundColor(.white)
         }
+    }
+}
+
+// MARK: - RobotNamingOnboardingView (Giriş / Kayıt Sonrası Tek Seferlik Robot İsimlendirme)
+
+struct RobotNamingOnboardingView: View {
+    @ObservedObject private var auth = AuthService.shared
+    @State private var nameInput: String = ""
+    @FocusState private var isFocused: Bool
+
+    private let suggestions = ["Nova", "Atlas", "Milo", "Badi", "Cuma"]
+
+    var body: some View {
+        ZStack {
+            GismoBackground()
+
+            VStack(spacing: 26) {
+                Spacer()
+
+                // Robot Face Emblem Only
+                ZStack {
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [Color.gCyan.opacity(0.32), Color.clear],
+                                center: .center,
+                                startRadius: 10,
+                                endRadius: 68
+                            )
+                        )
+                        .frame(width: 136, height: 136)
+
+                    RoundedRectangle(cornerRadius: 26, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.gSurface2, Color.gSurface],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 88, height: 88)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 26, style: .continuous)
+                                .stroke(LinearGradient.accent, lineWidth: 2)
+                        )
+                        .shadow(color: Color.gAccent.opacity(0.4), radius: 16, x: 0, y: 8)
+
+                    VStack(spacing: 8) {
+                        HStack(spacing: 12) {
+                            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                .fill(Color.gCyan)
+                                .frame(width: 13, height: 20)
+                            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                .fill(Color.gCyan)
+                                .frame(width: 13, height: 20)
+                        }
+                        .shadow(color: Color.gCyan.opacity(0.9), radius: 7)
+
+                        Capsule()
+                            .fill(Color.gSuccess)
+                            .frame(width: 18, height: 3.5)
+                    }
+                }
+
+                VStack(spacing: 10) {
+                    Text("Robotuna Bir İsim Ver")
+                        .font(.system(size: 26, weight: .black, design: .rounded))
+                        .foregroundColor(.white)
+                        .multilineTextAlignment(.center)
+
+                    Text("Bu isim yalnızca bir kez sorulur.\nEklediğin robotta bu isim görünecek ve robotun kendi adını bilecek.")
+                        .font(.system(size: 14, weight: .medium, design: .rounded))
+                        .foregroundColor(.gSubtext)
+                        .multilineTextAlignment(.center)
+                        .lineSpacing(3)
+                        .padding(.horizontal, 24)
+                }
+
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(.gCyan)
+
+                        TextField("Örn: Nova, Atlas, Milo...", text: $nameInput)
+                            .focused($isFocused)
+                            .textInputAutocapitalization(.words)
+                            .autocorrectionDisabled(true)
+                            .font(.system(size: 18, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+                            .submitLabel(.done)
+                            .onSubmit {
+                                submitName()
+                            }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 16)
+                    .background(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .fill(Color.gBg.opacity(0.9))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                    .stroke(Color.gCyan.opacity(0.55), lineWidth: 1.4)
+                            )
+                    )
+
+                    // Quick suggestion chips
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(suggestions, id: \.self) { suggestion in
+                                Button {
+                                    nameInput = suggestion
+                                } label: {
+                                    Text(suggestion)
+                                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                                        .foregroundColor(nameInput == suggestion ? .black : .white)
+                                        .padding(.horizontal, 14)
+                                        .padding(.vertical, 8)
+                                        .background(
+                                            Capsule()
+                                                .fill(nameInput == suggestion ? Color.gCyan : Color.gSurface2)
+                                                .overlay(
+                                                    Capsule()
+                                                        .stroke(Color.white.opacity(0.14), lineWidth: 1)
+                                                )
+                                        )
+                                }
+                            }
+                        }
+                    }
+
+                    Button {
+                        submitName()
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "checkmark.seal.fill")
+                                .font(.system(size: 16, weight: .bold))
+                            Text("İsmi Kaydet ve Başla")
+                                .font(.system(size: 16, weight: .bold, design: .rounded))
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .fill(LinearGradient.accent)
+                                .shadow(color: Color.gAccent.opacity(0.45), radius: 12, x: 0, y: 6)
+                        )
+                    }
+                    .disabled(nameInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .opacity(nameInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.5 : 1.0)
+                }
+                .padding(22)
+                .background(
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .fill(Color.gSurface.opacity(0.94))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                                .stroke(Color.gBorder, lineWidth: 1)
+                        )
+                )
+                .padding(.horizontal, 22)
+
+                Spacer()
+            }
+        }
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                isFocused = true
+            }
+        }
+    }
+
+    private func submitName() {
+        let trimmed = nameInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        isFocused = false
+        auth.saveCustomRobotName(trimmed)
     }
 }

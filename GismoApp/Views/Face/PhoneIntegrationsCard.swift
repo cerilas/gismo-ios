@@ -95,7 +95,7 @@ struct PhoneIntegrationsCard: View {
                 .buttonStyle(ScaleButtonStyle())
             }
 
-            Text("Gismo; kameran, rehberin, takvimin, alarmların, sağlık ve aktivite verilerin, konumun ve telefonunla ilgili soruları yanıtlayabilir ve senin için işlem yapabilir.")
+            Text("Robotun; kameran, rehberin, takvimin, alarmların, sağlık ve aktivite verilerin, konumun ve telefonunla ilgili soruları yanıtlayabilir ve senin için işlem yapabilir.")
                 .font(.system(size: 13, weight: .medium, design: .rounded))
                 .foregroundColor(.gSubtext)
                 .lineSpacing(3)
@@ -247,7 +247,7 @@ struct PhoneIntegrationsCard: View {
                 • Saat uygulamasındaki mevcut alarmları görmek
                 • Onaysız arama başlatmak / onaysız SMS göndermek
 
-                Gismo bunların yerine: anlık arama durumunu görür, aramayı tek onayla başlatır, mesaj taslağını hazırlar (SMS, iMessage, WhatsApp; arka planda göndermek için Netgsm), kendi kurduğu alarmları görür ve yönetir (iOS 26+'da gerçek alarm olarak çalar).
+                Robotun bunların yerine: anlık arama durumunu görür, aramayı tek onayla başlatır, mesaj taslağını hazırlar (SMS, iMessage, WhatsApp; arka planda göndermek için Netgsm), kendi kurduğu alarmları görür ve yönetir (iOS 26+'da gerçek alarm olarak çalar).
                 """)
                 .font(.system(size: 12, weight: .medium, design: .rounded))
                 .foregroundColor(.gSubtext)

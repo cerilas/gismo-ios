@@ -17,7 +17,7 @@ class SetupViewModel: ObservableObject {
     @Published var isConnecting = false
     @Published var errorMessage: String?
     @Published var connectionStatusMessage: String?
-    @Published var robotName: String = "Gismo-\(Int.random(in: 10...99))"
+    @Published var robotName: String = GismoMemoryService.shared.activeRobotName
     let robotID = UUID()
     private let savedWiFiPasswordsKey = "savedWiFiPasswords"
     private let robotOnlineTimeout: TimeInterval = 45

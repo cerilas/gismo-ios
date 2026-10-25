@@ -146,7 +146,7 @@ struct SetupSuccessView: View {
             }
 
             VStack(spacing: 12) {
-                Text("Gismo Çevrimiçi!")
+                Text("\(viewModel.robotName) Çevrimiçi!")
                     .font(.system(size: 28, weight: .black, design: .rounded))
                     .foregroundColor(.white)
 

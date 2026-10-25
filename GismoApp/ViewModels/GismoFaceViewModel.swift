@@ -66,7 +66,16 @@ final class GismoFaceViewModel: ObservableObject {
         self.robot = robot
         let testMode = UserDefaults.standard.bool(forKey: "isTestModeEnabled")
         self.isRobotBodyOnline = testMode ? true : robot.isOnline
-        voiceEngine.robotName = robot.name
+
+        let resolvedName: String = {
+            let trimmed = robot.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty && !trimmed.lowercased().hasPrefix("gismo") {
+                return trimmed
+            }
+            return GismoMemoryService.shared.activeRobotName
+        }()
+        GismoMemoryService.shared.activeRobotNameOverride = resolvedName
+        voiceEngine.robotName = resolvedName
         WebSocketService.shared.connect()  // Manuel kontrol gibi komut gönderebilmek için
 
         robotNotificationCancellable = NotificationCenter.default
@@ -1038,21 +1047,27 @@ final class GismoFaceViewModel: ObservableObject {
         lastSpecificInputKind = detectedKind
     }
 
+    var activeRobotName: String {
+        GismoMemoryService.shared.activeRobotName
+    }
+
     func speakDemoGreeting() {
         guard isRobotBodyOnline && !isThinking && !isSpeaking else { return }
+        let rName = activeRobotName
         Task {
-            await handleUtterance("Merhaba Gismo, kendini kısaca tanıtır mısın?")
+            await handleUtterance("Merhaba \(rName), kendini kısaca tanıtır mısın?")
         }
     }
 
     private func localFallbackMessage(for userText: String) -> GeminiMessage {
         let lower = userText.lowercased()
+        let rName = activeRobotName
         if lower.contains("merhaba") || lower.contains("selam") {
-            return GeminiMessage(text: "Merhaba! Ben Gismo, seni duyduğuma çok sevindim!", emotion: .veryHappy, duration: 4.5, motorSequence: [])
+            return GeminiMessage(text: "Merhaba! Ben \(rName), seni duyduğuma çok sevindim!", emotion: .veryHappy, duration: 4.5, motorSequence: [])
         } else if lower.contains("nasılsın") || lower.contains("ne haber") {
             return GeminiMessage(text: "Harikayım, devrelerim enerji dolu! Sen nasılsın?", emotion: .happy, duration: 4.5, motorSequence: [])
         } else if lower.contains("kimsin") || lower.contains("adın ne") {
-            return GeminiMessage(text: "Ben Gismo! Senin sevimli robot arkadaşınım.", emotion: .happy, duration: 4.5, motorSequence: [])
+            return GeminiMessage(text: "Ben \(rName)! Senin sevimli robot arkadaşınım.", emotion: .happy, duration: 4.5, motorSequence: [])
         } else if lower.contains("fotoğraf") || lower.contains("selfie") || lower.contains("resim") {
             return GeminiMessage(text: "Hemen fotoğrafını çekiyorum, gülümse!", emotion: .veryHappy, duration: 4.5, motorSequence: [])
         } else if lower.contains("uyu") || lower.contains("iyi geceler") {

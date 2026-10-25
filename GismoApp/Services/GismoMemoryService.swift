@@ -25,10 +25,13 @@ struct GismoMemoryItem: Codable, Identifiable, Equatable, Sendable {
 final class GismoMemoryService: @unchecked Sendable {
     static let shared = GismoMemoryService()
 
-    private let storageKey = "gismo_permanent_memories_v1"
+    private let legacyStorageKey = "gismo_permanent_memories_v1"
     private let deviceIdKey = "gismo_memory_device_id"
     private let lock = NSLock()
     private var items: [GismoMemoryItem] = []
+
+    /// Aktif konuşulan robotun adı (kullanıcının verdiği isim)
+    var activeRobotNameOverride: String?
 
     /// Yeni bir hafıza eklendiğinde Gemini Live oturumunun güncellenmesi için sayaç
     private(set) var revision: Int = 0
@@ -59,6 +62,28 @@ final class GismoMemoryService: @unchecked Sendable {
         return user.fullName
     }
 
+    /// Her kullanıcının hafızasını kendi kullanıcı ID'si altında izole tutar
+    private var activeStorageKey: String {
+        if let uid = currentUserId, !uid.isEmpty {
+            return "gismo_permanent_memories_v1_\(uid)"
+        }
+        return "gismo_permanent_memories_v1_guest"
+    }
+
+    /// Kullanıcının robotuna verdiği aktif isim
+    var activeRobotName: String {
+        if let override = activeRobotNameOverride?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !override.isEmpty {
+            return override
+        }
+        if let uid = currentUserId,
+           let saved = UserDefaults.standard.string(forKey: "user_custom_robot_name_\(uid)")?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !saved.isEmpty {
+            return saved
+        }
+        return "Robot"
+    }
+
     private init() {
         loadFromDisk()
         seedOwnerFromAuthIfNeeded()
@@ -67,29 +92,65 @@ final class GismoMemoryService: @unchecked Sendable {
         }
     }
 
-    // MARK: - Disk Persistence
+    // MARK: - User Session Switching & Disk Persistence
+
+    func reloadForCurrentUser() {
+        loadFromDisk()
+        seedOwnerFromAuthIfNeeded()
+        Task {
+            await syncFromServer()
+        }
+    }
+
+    func clearCurrentUserLocalMemories() {
+        let key = activeStorageKey
+        lock.lock()
+        items = []
+        revision &+= 1
+        UserDefaults.standard.removeObject(forKey: key)
+        UserDefaults.standard.removeObject(forKey: legacyStorageKey)
+        lock.unlock()
+    }
 
     private func loadFromDisk() {
         lock.lock()
         defer { lock.unlock() }
-        guard let data = UserDefaults.standard.data(forKey: storageKey),
-              let decoded = try? JSONDecoder().decode([GismoMemoryItem].self, from: data) else {
+
+        guard currentUserId != nil else {
             items = []
             return
         }
-        items = decoded.sorted { $0.updatedAt > $1.updatedAt }
+
+        let key = activeStorageKey
+        if let data = UserDefaults.standard.data(forKey: key),
+           let decoded = try? JSONDecoder().decode([GismoMemoryItem].self, from: data) {
+            items = decoded.sorted { $0.updatedAt > $1.updatedAt }
+            return
+        }
+
+        // Tek seferlik eski anahtardan aktif kullanıcıya taşıma
+        if let legacyData = UserDefaults.standard.data(forKey: legacyStorageKey),
+           let decoded = try? JSONDecoder().decode([GismoMemoryItem].self, from: legacyData) {
+            items = decoded.sorted { $0.updatedAt > $1.updatedAt }
+            saveToDiskLocked()
+            UserDefaults.standard.removeObject(forKey: legacyStorageKey)
+            return
+        }
+
+        items = []
     }
 
     private func saveToDiskLocked() {
+        guard currentUserId != nil else { return }
         if let encoded = try? JSONEncoder().encode(items) {
-            UserDefaults.standard.set(encoded, forKey: storageKey)
+            UserDefaults.standard.set(encoded, forKey: activeStorageKey)
         }
     }
 
     func seedOwnerFromAuthIfNeeded() {
-        guard let name = currentUserName, !name.isEmpty, name != "Gismo Kullanıcısı" else { return }
+        guard let name = currentUserName, !name.isEmpty, name != "Gismo Kullanıcısı", name != "Kullanıcı" else { return }
         lock.lock()
-        let hasOwnerName = items.contains { $0.category == "owner" && $0.subject.lowercased().contains("isim") }
+        let hasOwnerName = items.contains { $0.category == "owner" && $0.subject.lowercased().contains("sahibimin ismi") }
         lock.unlock()
         if !hasOwnerName {
             _ = upsertMemory(
@@ -218,10 +279,12 @@ final class GismoMemoryService: @unchecked Sendable {
 
         let includedCount = ownerFacts.count + peopleFacts.count + notes.count + topics.count
         let archivedExtraCount = max(0, snapshot.count - includedCount)
+        let currentRobotName = activeRobotName
 
         var lines: [String] = [
-            "KALICI HAFIZA (BELLEK) SİSTEMİ:",
-            "- Sahibini, konuştuğunuz konuları, tanıştığın kişileri ve 'bunu aklında tut / unutma' denilen her şeyi kalıcı hafızanda tutarsın.",
+            "ROBOT KİMLİĞİ VE KALICI HAFIZA (BELLEK) SİSTEMİ:",
+            "- SENİN ADIN: Kullanıcının sana verdiği özel isim \"\(currentRobotName)\". Adın sorulduğunda, kendini tanıtırken veya konuşurken her zaman adının \"\(currentRobotName)\" olduğunu bil ve söyle (asla Gismo deme).",
+            "- Sahibini, konuştuğunuz konuları, tanıştığın kişileri ve 'bunu aklında tut / unutma' denilen her şeyi kullanıcının hesabına özel kalıcı hafızanda tutarsın.",
             "- Kullanıcı sana kendisiyle ilgili bir bilgi söylediğinde (`category: 'owner'`), bir kişiyi tanıttığında (`category: 'person'`), önemli bir konudan konuştuğunuzda (`category: 'topic'`) ya da 'bunu aklında tut / unutma / hafızana kaydet' dediğinde (`category: 'note'`) `saveMemory` aracını çağır.",
             "- Aşağıdaki listede olmayan daha eski bir kişi, konu veya not sorulursa `recallMemories` aracını çağırarak tüm hafıza arşivinde ara.",
             "- Kullanıcı 'bunu unut / hafızandan sil' derse `forgetMemory` aracını çağır."
@@ -452,12 +515,12 @@ final class GismoMemoryService: @unchecked Sendable {
     // MARK: - Remote PostgreSQL Sync (/api/memories)
 
     func syncFromServer() async {
+        guard let uid = currentUserId, !uid.isEmpty else { return }
         var components = URLComponents(string: "\(Config.baseURL)/api/memories")
-        var queryItems = [URLQueryItem(name: "device_id", value: deviceId)]
-        if let uid = currentUserId {
-            queryItems.append(URLQueryItem(name: "user_id", value: uid))
-        }
-        components?.queryItems = queryItems
+        components?.queryItems = [
+            URLQueryItem(name: "user_id", value: uid),
+            URLQueryItem(name: "device_id", value: deviceId)
+        ]
         guard let url = components?.url else { return }
 
         var req = URLRequest(url: url)
@@ -484,6 +547,23 @@ final class GismoMemoryService: @unchecked Sendable {
                 id: id,
                 syncRemote: false
             )
+
+            // Bulut hafızada "Robotun İsmi" kayıtlıysa ve bu cihazda henüz yoksa otomatik geri yükle
+            if subject.caseInsensitiveCompare("Robotun İsmi") == .orderedSame {
+                let extractedName = content
+                    .replacingOccurrences(of: "Benim adım ", with: "")
+                    .replacingOccurrences(of: ".", with: "")
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                if !extractedName.isEmpty {
+                    let key = "user_custom_robot_name_\(uid)"
+                    if (UserDefaults.standard.string(forKey: key) ?? "").isEmpty {
+                        UserDefaults.standard.set(extractedName, forKey: key)
+                        await MainActor.run {
+                            AuthService.shared.refreshCustomRobotNameState()
+                        }
+                    }
+                }
+            }
         }
     }
 

@@ -13,9 +13,13 @@ struct GismoApp: App {
                 if showSplash {
                     SplashView()
                         .transition(.opacity)
-                        .zIndex(2)
+                        .zIndex(3)
                 } else if !userAuth.isAuthenticated {
                     AuthView()
+                        .transition(.opacity)
+                        .zIndex(2)
+                } else if userAuth.needsRobotNamingOnboarding {
+                    RobotNamingOnboardingView()
                         .transition(.opacity)
                         .zIndex(1)
                 } else {
@@ -26,6 +30,7 @@ struct GismoApp: App {
             }
             .animation(.easeInOut(duration: 0.6), value: showSplash)
             .animation(.easeInOut(duration: 0.4), value: userAuth.isAuthenticated)
+            .animation(.easeInOut(duration: 0.4), value: userAuth.needsRobotNamingOnboarding)
             .onAppear {
                 GoogleAuthService.shared.checkStatus()
                 userAuth.loadSavedSession()
