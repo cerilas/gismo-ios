@@ -1,6 +1,7 @@
 import Foundation
 import SwiftUI
 import GoogleSignIn
+import AuthenticationServices
 import UIKit
 
 // MARK: - User Model
@@ -98,10 +99,23 @@ final class AuthService: ObservableObject {
 
     // MARK: - Session Persistence
 
+    private static let demoReviewerEmails: Set<String> = [
+        "apple@cerilas.com",
+        "demo@cerilas.com",
+        "review@cerilas.com"
+    ]
+
+    private func applyReviewerDemoModeIfNeeded(for user: GismoUser) {
+        if Self.demoReviewerEmails.contains(user.email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()) {
+            UserDefaults.standard.set(true, forKey: "isTestModeEnabled")
+        }
+    }
+
     func loadSavedSession() {
         if let token = authToken, !token.isEmpty,
            let data = UserDefaults.standard.data(forKey: userKey),
            let savedUser = try? JSONDecoder().decode(GismoUser.self, from: data) {
+            applyReviewerDemoModeIfNeeded(for: savedUser)
             self.currentUser = savedUser
             self.isAuthenticated = true
             Task {
@@ -118,6 +132,7 @@ final class AuthService: ObservableObject {
         if let encoded = try? JSONEncoder().encode(user) {
             UserDefaults.standard.set(encoded, forKey: userKey)
         }
+        applyReviewerDemoModeIfNeeded(for: user)
         withAnimation(.spring(response: 0.4, dampingFraction: 0.82)) {
             self.currentUser = user
             self.isAuthenticated = true
@@ -322,6 +337,61 @@ final class AuthService: ObservableObject {
         saveSession(token: token, user: user)
     }
 
+    // MARK: - 5b. Sign In / Sign Up with Apple (Guideline 4.8)
+
+    private var appleSignInCoordinator: AppleSignInCoordinator?
+
+    func signInWithApple() async throws {
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+
+        let credential: ASAuthorizationAppleIDCredential = try await withCheckedThrowingContinuation { continuation in
+            let coordinator = AppleSignInCoordinator { result in
+                continuation.resume(with: result)
+            }
+            self.appleSignInCoordinator = coordinator
+            coordinator.startSignInWithAppleFlow()
+        }
+        self.appleSignInCoordinator = nil
+
+        let appleUserId = credential.user
+        let identityTokenString = credential.identityToken.flatMap { String(data: $0, encoding: .utf8) } ?? ""
+
+        // Apple only sends email & fullName on the very first authorization; cache them locally per Apple user ID
+        let cachedEmailKey = "gismo_apple_email_\(appleUserId)"
+        let cachedNameKey  = "gismo_apple_name_\(appleUserId)"
+
+        let rawEmail = credential.email?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !rawEmail.isEmpty {
+            UserDefaults.standard.set(rawEmail, forKey: cachedEmailKey)
+        }
+        let email = !rawEmail.isEmpty ? rawEmail : (UserDefaults.standard.string(forKey: cachedEmailKey) ?? "")
+
+        let formatter = PersonNameComponentsFormatter()
+        let rawName = credential.fullName.map { formatter.string(from: $0).trimmingCharacters(in: .whitespacesAndNewlines) } ?? ""
+        if !rawName.isEmpty {
+            UserDefaults.standard.set(rawName, forKey: cachedNameKey)
+        }
+        let fullName = !rawName.isEmpty ? rawName : (UserDefaults.standard.string(forKey: cachedNameKey) ?? "")
+
+        let body: [String: Any] = [
+            "apple_id": appleUserId,
+            "identity_token": identityTokenString,
+            "email": email,
+            "full_name": fullName
+        ]
+
+        let response: AuthResponse = try await post(path: "/api/auth/apple", body: body)
+        guard let token = response.token, let user = response.user else {
+            let msg = response.error ?? "Apple ile giriş sunucuya kaydedilemedi."
+            errorMessage = msg
+            throw NSError(domain: "Auth", code: 500, userInfo: [NSLocalizedDescriptionKey: msg])
+        }
+
+        saveSession(token: token, user: user)
+    }
+
     // MARK: - 6. Sign Out & Delete Account
 
     func signOut() {
@@ -346,6 +416,7 @@ final class AuthService: ObservableObject {
         req.timeoutInterval = 12
 
         _ = try? await URLSession.shared.data(for: req)
+        UserDefaults.standard.removeObject(forKey: "gismo_permanent_memories_v1")
         signOut()
     }
 
@@ -389,5 +460,54 @@ final class AuthService: ObservableObject {
             current = presented
         }
         return current
+    }
+}
+
+// MARK: - AppleSignInCoordinator
+
+final class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
+    private let completion: (Result<ASAuthorizationAppleIDCredential, Error>) -> Void
+
+    init(completion: @escaping (Result<ASAuthorizationAppleIDCredential, Error>) -> Void) {
+        self.completion = completion
+    }
+
+    func startSignInWithAppleFlow() {
+        let appleIDProvider = ASAuthorizationAppleIDProvider()
+        let request = appleIDProvider.createRequest()
+        request.requestedScopes = [.fullName, .email]
+
+        let authorizationController = ASAuthorizationController(authorizationRequests: [request])
+        authorizationController.delegate = self
+        authorizationController.presentationContextProvider = self
+        authorizationController.performRequests()
+    }
+
+    func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
+        if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let window = scene.windows.first(where: { $0.isKeyWindow }) ?? scene.windows.first {
+            return window
+        }
+        return ASPresentationAnchor()
+    }
+
+    func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
+        if let credential = authorization.credential as? ASAuthorizationAppleIDCredential {
+            completion(.success(credential))
+        } else {
+            completion(.failure(NSError(
+                domain: "Auth",
+                code: 400,
+                userInfo: [NSLocalizedDescriptionKey: "Apple hesap bilgisi alınamadı."]
+            )))
+        }
+    }
+
+    func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
+        if let authError = error as? ASAuthorizationError, authError.code == .canceled {
+            completion(.failure(authError))
+            return
+        }
+        completion(.failure(error))
     }
 }

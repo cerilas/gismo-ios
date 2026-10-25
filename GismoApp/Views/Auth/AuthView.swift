@@ -56,8 +56,11 @@ struct AuthView: View {
 
                     // MARK: - Main Card
                     VStack(spacing: 20) {
-                        // Google Sign-In / Sign-Up Button
-                        googleAuthButton
+                        // Social Sign-In Buttons (Apple & Google)
+                        VStack(spacing: 10) {
+                            appleAuthButton
+                            googleAuthButton
+                        }
 
                         // Divider
                         HStack(spacing: 12) {
@@ -184,7 +187,48 @@ struct AuthView: View {
         }
     }
 
-    // MARK: - Google Sign-In / Sign-Up Button
+    // MARK: - Apple & Google Sign-In / Sign-Up Buttons
+
+    private var appleAuthButton: some View {
+        Button {
+            clearMessages()
+            Task {
+                try? await auth.signInWithApple()
+            }
+        } label: {
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(Color.white)
+                        .frame(width: 28, height: 28)
+                    Image(systemName: "apple.logo")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundColor(.black)
+                }
+
+                Text("Apple ile Giriş Yap / Kayıt Ol")
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+
+                Spacer()
+
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(.gSubtext)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(Color.black.opacity(0.65))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .stroke(Color.white.opacity(0.22), lineWidth: 1)
+                    )
+            )
+        }
+        .disabled(auth.isLoading)
+    }
 
     private var googleAuthButton: some View {
         Button {
@@ -855,7 +899,9 @@ struct UserProfileSheet: View {
                             profileRow(
                                 icon: "server.rack",
                                 label: "Giriş Yöntemi",
-                                value: user.authProvider == "google" ? "Google Hesabı" : "E-posta / Telefon & SMS"
+                                value: user.authProvider == "google"
+                                    ? "Google Hesabı"
+                                    : (user.authProvider == "apple" ? "Apple Hesabı" : "E-posta / Telefon & SMS")
                             )
                         }
                         .padding(18)
