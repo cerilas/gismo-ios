@@ -87,7 +87,7 @@ final class AuthService: ObservableObject {
 
     var effectiveRobotName: String {
         let trimmed = customRobotName.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? "Robot" : trimmed
+        return trimmed.isEmpty ? "Milo" : trimmed
     }
 
     private let tokenKey = "gismo_auth_jwt_token"

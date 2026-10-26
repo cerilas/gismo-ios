@@ -244,7 +244,7 @@ private struct RobotDTO: Decodable {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.firstString(for: [CodingKeys.id, CodingKeys.robotID]) ?? UUID().uuidString
-        name = try container.firstString(for: [CodingKeys.name, CodingKeys.robotName]) ?? "Gismo"
+        name = try container.firstString(for: [CodingKeys.name, CodingKeys.robotName]) ?? "Milo"
         lastIP = try container.firstString(for: [
             CodingKeys.lastIP,
             CodingKeys.lastIp,

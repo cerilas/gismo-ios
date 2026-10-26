@@ -60,6 +60,8 @@ class RobotListViewModel: ObservableObject {
             let current = list[idx].name.trimmingCharacters(in: .whitespacesAndNewlines)
             let isDefaultName = current.isEmpty
                 || current.lowercased().hasPrefix("gismo")
+                || current.lowercased() == "milo"
+                || current.lowercased().hasPrefix("milo-")
                 || current.lowercased() == "robot"
 
             let targetName: String? = {
@@ -173,7 +175,7 @@ class RobotListViewModel: ObservableObject {
     func addRobot(_ robot: Robot) {
         var added = robot
         let trimmed = added.name.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.isEmpty || trimmed.lowercased().hasPrefix("gismo") {
+        if trimmed.isEmpty || trimmed.lowercased().hasPrefix("gismo") || trimmed.lowercased() == "robot" {
             added.name = AuthService.shared.effectiveRobotName
         } else {
             AuthService.shared.saveCustomRobotName(trimmed)

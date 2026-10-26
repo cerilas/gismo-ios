@@ -55,7 +55,7 @@ enum RobotCommand: String, CaseIterable {
 
 extension Robot {
     static let mockRobots: [Robot] = [
-        Robot(id: UUID(), name: "Gismo-01", ipAddress: "192.168.1.45", lastSeen: Date(), isOnline: true),
-        Robot(id: UUID(), name: "Gismo-02", ipAddress: "192.168.1.67", lastSeen: Date().addingTimeInterval(-3600), isOnline: false)
+        Robot(id: UUID(), name: "Milo-01", ipAddress: "192.168.1.45", lastSeen: Date(), isOnline: true),
+        Robot(id: UUID(), name: "Milo-02", ipAddress: "192.168.1.67", lastSeen: Date().addingTimeInterval(-3600), isOnline: false)
     ]
 }

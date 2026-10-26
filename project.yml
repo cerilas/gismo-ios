@@ -39,17 +39,17 @@ targets:
     info:
       path: GismoApp/Info.plist
       properties:
-        CFBundleDisplayName: Gismo
-        CFBundleName: Gismo
+        CFBundleDisplayName: "Milo: Desktop AI Companion Robot"
+        CFBundleName: "Milo: Desktop AI Companion Robot"
         UILaunchStoryboardName: ""
         UIUserInterfaceStyle: Dark
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
-        NSLocalNetworkUsageDescription: "Gismo robota yerel ağ üzerinden bağlanmak için gereklidir."
-        NSMicrophoneUsageDescription: "Gismo seninle konuşabilmek için mikrofona ihtiyaç duyuyor."
-        NSSpeechRecognitionUsageDescription: "Gismo seni dinleyebilmek için konuşma tanıma iznine ihtiyaç duyuyor."
-        NSCameraUsageDescription: "Gismo fotoğraf çekebilmek için kameraya ihtiyaç duyuyor."
-        NSPhotoLibraryAddUsageDescription: "Gismo çektiği fotoğrafı galerine kaydetmek için izin istiyor."
+        NSLocalNetworkUsageDescription: "Milo robota yerel ağ üzerinden bağlanmak için gereklidir."
+        NSMicrophoneUsageDescription: "Milo seninle konuşabilmek için mikrofona ihtiyaç duyuyor."
+        NSSpeechRecognitionUsageDescription: "Milo seni dinleyebilmek için konuşma tanıma iznine ihtiyaç duyuyor."
+        NSCameraUsageDescription: "Milo fotoğraf çekebilmek için kameraya ihtiyaç duyuyor."
+        NSPhotoLibraryAddUsageDescription: "Milo çektiği fotoğrafı galerine kaydetmek için izin istiyor."
         NSBonjourServices:
           - "_http._tcp"
         GIDClientID: "312777580050-0od6id68t7gh274aveien553acopmrsr.apps.googleusercontent.com"

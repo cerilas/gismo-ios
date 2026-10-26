@@ -285,7 +285,7 @@ final class GeminiService {
             "parameters": [
                 "type": "OBJECT",
                 "properties": [
-                    "fileName": ["type": "STRING", "description": "Kaydedilecek fotoğrafın adı (opsiyonel, örn: gismo_selfie.jpg)."],
+                    "fileName": ["type": "STRING", "description": "Kaydedilecek fotoğrafın adı (opsiyonel, örn: milo_selfie.jpg)."],
                     "useLastPhoto": ["type": "BOOLEAN", "description": "true = yeni fotoğraf çekmeden galerideki/son çekilen fotoğrafı yükler. false = kameradan yeni fotoğraf çekip yükler."]
                 ]
             ]
@@ -296,7 +296,7 @@ final class GeminiService {
             "parameters": [
                 "type": "OBJECT",
                 "properties": [
-                    "fileName": ["type": "STRING", "description": "Fotoğraf dosya adı (opsiyonel, örn: gismo_ani.jpg)."],
+                    "fileName": ["type": "STRING", "description": "Fotoğraf dosya adı (opsiyonel, örn: milo_ani.jpg)."],
                     "description": ["type": "STRING", "description": "Fotoğraf açıklaması."],
                     "useLastPhoto": ["type": "BOOLEAN", "description": "true = yeni fotoğraf çekmeden galerideki/son çekilen fotoğrafı yükler. false = kameradan yeni fotoğraf çekip yükler."]
                 ]
@@ -653,7 +653,7 @@ final class GeminiService {
         case "sendEmail":
             let rawRecipient = args["recipient"] as? String ?? ""
             let recipient = Self.normalizeEmailAddress(rawRecipient)
-            let subject = args["subject"] as? String ?? "Gismo Mesajı"
+            let subject = args["subject"] as? String ?? "Milo Mesajı"
             let body = args["body"] as? String ?? ""
             guard Self.isValidEmailFormat(recipient) else {
                 triggerManualInput(
@@ -767,7 +767,7 @@ final class GeminiService {
             }
 
         case "createDriveFile":
-            let fileName = args["fileName"] as? String ?? "gismo_not.txt"
+            let fileName = args["fileName"] as? String ?? "milo_not.txt"
             let content = args["content"] as? String ?? ""
             do {
                 let id = try await GoogleDriveService.shared.createTextFile(name: fileName, content: content)
@@ -844,7 +844,7 @@ final class GeminiService {
 
         case "uploadPhotoToDrive":
             let rawName = (args["fileName"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-            let fileName = rawName.isEmpty ? "gismo_foto_\(Int(Date().timeIntervalSince1970)).jpg" : rawName
+            let fileName = rawName.isEmpty ? "milo_foto_\(Int(Date().timeIntervalSince1970)).jpg" : rawName
             let useLast = (args["useLastPhoto"] as? Bool == true) || preferExistingPhotoInCurrentTurn
             let photoData: Data?
             if useLast {
@@ -864,8 +864,8 @@ final class GeminiService {
 
         case "uploadPhotoToGooglePhotos":
             let rawName = (args["fileName"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-            let fileName = rawName.isEmpty ? "gismo_foto_\(Int(Date().timeIntervalSince1970)).jpg" : rawName
-            let desc = args["description"] as? String ?? "Gismo ile çekilen fotoğraf"
+            let fileName = rawName.isEmpty ? "milo_foto_\(Int(Date().timeIntervalSince1970)).jpg" : rawName
+            let desc = args["description"] as? String ?? "Milo ile çekilen fotoğraf"
             let useLast = (args["useLastPhoto"] as? Bool == true) || preferExistingPhotoInCurrentTurn
             let photoData: Data?
             if useLast {
@@ -928,8 +928,8 @@ final class GeminiService {
                 )
                 return ("Fotoğrafın gönderileceği e-posta adresi tam anlaşılamadı. Ekranda e-posta yazma kutusu açıldı.", [])
             }
-            let subject = (args["subject"] as? String)?.isEmpty == false ? (args["subject"] as! String) : "Gismo'dan Fotoğraf"
-            let body = (args["body"] as? String)?.isEmpty == false ? (args["body"] as! String) : "Merhaba, Gismo ile fotoğrafınız ektedir."
+            let subject = (args["subject"] as? String)?.isEmpty == false ? (args["subject"] as! String) : "Milo'dan Fotoğraf"
+            let body = (args["body"] as? String)?.isEmpty == false ? (args["body"] as! String) : "Merhaba, Milo ile fotoğrafınız ektedir."
             let useLast = (args["useLastPhoto"] as? Bool == true) || preferExistingPhotoInCurrentTurn
             let photoData: Data?
             if useLast {

@@ -81,7 +81,7 @@ final class GismoMemoryService: @unchecked Sendable {
            !saved.isEmpty {
             return saved
         }
-        return "Robot"
+        return "Milo"
     }
 
     private init() {
@@ -148,7 +148,7 @@ final class GismoMemoryService: @unchecked Sendable {
     }
 
     func seedOwnerFromAuthIfNeeded() {
-        guard let name = currentUserName, !name.isEmpty, name != "Gismo Kullanıcısı", name != "Kullanıcı" else { return }
+        guard let name = currentUserName, !name.isEmpty, name != "Gismo Kullanıcısı", name != "Milo Kullanıcısı", name != "Kullanıcı" else { return }
         lock.lock()
         let hasOwnerName = items.contains { $0.category == "owner" && $0.subject.lowercased().contains("sahibimin ismi") }
         lock.unlock()
@@ -322,7 +322,7 @@ final class GismoMemoryService: @unchecked Sendable {
     static let functionDeclarations: [[String: Any]] = [
         [
             "name": "saveMemory",
-            "description": "Sahibin (kullanıcı) hakkında bir bilgiyi, tanışılan bir kişiyi, konuşulan önemli bir konuyu veya kullanıcının 'bunu aklında tut / unutma / kaydet' dediği bir notu Gismo'nun kalıcı hafızasına kaydeder.",
+            "description": "Sahibin (kullanıcı) hakkında bir bilgiyi, tanışılan bir kişiyi, konuşulan önemli bir konuyu veya kullanıcının 'bunu aklında tut / unutma / kaydet' dediği bir notu Milo'nun kalıcı hafızasına kaydeder.",
             "parameters": [
                 "type": "OBJECT",
                 "properties": [
@@ -344,7 +344,7 @@ final class GismoMemoryService: @unchecked Sendable {
         ],
         [
             "name": "recallMemories",
-            "description": "Gismo'nun kalıcı hafızasında kayıtlı olan bilgileri (sahibi, kişiler, önceki konular, notlar) arar ve getirir.",
+            "description": "Milo'nun kalıcı hafızasında kayıtlı olan bilgileri (sahibi, kişiler, önceki konular, notlar) arar ve getirir.",
             "parameters": [
                 "type": "OBJECT",
                 "properties": [

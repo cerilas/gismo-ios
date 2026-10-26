@@ -7,7 +7,7 @@ final class GismoVoiceEngine: ObservableObject {
     @Published var isListening = false
     @Published var liveTranscript = ""
 
-    var robotName: String = "gismo"
+    var robotName: String = "milo"
     var onUtteranceReady: ((String) -> Void)?
 
     private let speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "tr-TR"))

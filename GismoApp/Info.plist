@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Gismo</string>
+	<string>Milo: Desktop AI Companion Robot</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -13,7 +13,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>Gismo</string>
+	<string>Milo: Desktop AI Companion Robot</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -39,41 +39,41 @@
 		<string>tel</string>
 	</array>
 	<key>NSAlarmKitUsageDescription</key>
-	<string>Gismo senin için alarm ve zamanlayıcı kurabilmek istiyor.</string>
+	<string>Milo senin için alarm ve zamanlayıcı kurabilmek istiyor.</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_http._tcp</string>
 	</array>
 	<key>NSCalendarsFullAccessUsageDescription</key>
-	<string>Gismo takvimindeki etkinlikleri sana söyleyebilmek ve yeni etkinlik ekleyebilmek için takvimine erişmek istiyor.</string>
+	<string>Milo takvimindeki etkinlikleri sana söyleyebilmek ve yeni etkinlik ekleyebilmek için takvimine erişmek istiyor.</string>
 	<key>NSCalendarsUsageDescription</key>
-	<string>Gismo takvimindeki etkinlikleri sana söyleyebilmek ve yeni etkinlik ekleyebilmek için takvimine erişmek istiyor.</string>
+	<string>Milo takvimindeki etkinlikleri sana söyleyebilmek ve yeni etkinlik ekleyebilmek için takvimine erişmek istiyor.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Gismo fotoğraf çekebilmek için kameraya ihtiyaç duyuyor.</string>
+	<string>Milo fotoğraf çekebilmek için kameraya ihtiyaç duyuyor.</string>
 	<key>NSContactsUsageDescription</key>
-	<string>Gismo rehberindeki kişileri bulup numaralarını, doğum günlerini söyleyebilmek, onları arayabilmek ve mesaj atabilmek için rehberine erişmek istiyor.</string>
+	<string>Milo rehberindeki kişileri bulup numaralarını, doğum günlerini söyleyebilmek, onları arayabilmek ve mesaj atabilmek için rehberine erişmek istiyor.</string>
 	<key>NSHealthShareUsageDescription</key>
-	<string>Gismo adım, nabız, uyku ve aktivite gibi sağlık verilerinle ilgili sorularını yanıtlayabilmek için Sağlık verilerini okumak istiyor.</string>
+	<string>Milo adım, nabız, uyku ve aktivite gibi sağlık verilerinle ilgili sorularını yanıtlayabilmek için Sağlık verilerini okumak istiyor.</string>
 	<key>NSHealthUpdateUsageDescription</key>
-	<string>Gismo Sağlık uygulamasına veri yazmaz; bu izin yalnızca sistem gereği istenir.</string>
+	<string>Milo Sağlık uygulamasına veri yazmaz; bu izin yalnızca sistem gereği istenir.</string>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Gismo robota yerel ağ üzerinden bağlanmak için gereklidir.</string>
+	<string>Milo robota yerel ağ üzerinden bağlanmak için gereklidir.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Gismo nerede olduğunu söyleyebilmek, hava durumunu ve yol tarifini verebilmek için konumuna erişmek istiyor.</string>
+	<string>Milo nerede olduğunu söyleyebilmek, hava durumunu ve yol tarifini verebilmek için konumuna erişmek istiyor.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Gismo seninle konuşabilmek için mikrofona ihtiyaç duyuyor.</string>
+	<string>Milo seninle konuşabilmek için mikrofona ihtiyaç duyuyor.</string>
 	<key>NSMotionUsageDescription</key>
-	<string>Gismo adım sayını, yürüdüğün mesafeyi ve hareket durumunu söyleyebilmek için hareket verilerine erişmek istiyor.</string>
+	<string>Milo adım sayını, yürüdüğün mesafeyi ve hareket durumunu söyleyebilmek için hareket verilerine erişmek istiyor.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>Gismo çektiği fotoğrafı galerine kaydetmek için izin istiyor.</string>
+	<string>Milo çektiği fotoğrafı galerine kaydetmek için izin istiyor.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Gismo galerindeki son fotoğrafı isteğin üzerine Google Drive, Google Fotoğraflar veya e-posta ile gönderebilmek için fotoğraf arşivine erişmek istiyor.</string>
+	<string>Milo galerindeki son fotoğrafı isteğin üzerine Google Drive, Google Fotoğraflar veya e-posta ile gönderebilmek için fotoğraf arşivine erişmek istiyor.</string>
 	<key>NSRemindersFullAccessUsageDescription</key>
-	<string>Gismo yapılacaklarını okuyabilmek ve yeni hatırlatıcı ekleyebilmek için Anımsatıcılar'a erişmek istiyor.</string>
+	<string>Milo yapılacaklarını okuyabilmek ve yeni hatırlatıcı ekleyebilmek için Anımsatıcılar'a erişmek istiyor.</string>
 	<key>NSRemindersUsageDescription</key>
-	<string>Gismo yapılacaklarını okuyabilmek ve yeni hatırlatıcı ekleyebilmek için Anımsatıcılar'a erişmek istiyor.</string>
+	<string>Milo yapılacaklarını okuyabilmek ve yeni hatırlatıcı ekleyebilmek için Anımsatıcılar'a erişmek istiyor.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>Gismo seni dinleyebilmek için konuşma tanıma iznine ihtiyaç duyuyor.</string>
+	<string>Milo seni dinleyebilmek için konuşma tanıma iznine ihtiyaç duyuyor.</string>
 	<key>UILaunchStoryboardName</key>
 	<string></string>
 	<key>UISupportedInterfaceOrientations</key>

@@ -317,7 +317,7 @@ final class PhoneIntegrationService: ObservableObject {
             }
             return "\(cap.title) bu cihazda desteklenmiyor."
         case .denied:
-            return "\(cap.title) izni reddedilmiş. Kullanıcı iPhone Ayarlar > Gismo bölümünden izni açmalı."
+            return "\(cap.title) izni reddedilmiş. Kullanıcı iPhone Ayarlar > Milo bölümünden izni açmalı."
         case .notDetermined:
             let ok = await requestAccess(cap)
             return ok ? nil : "\(cap.title) izni verilmedi."
@@ -387,10 +387,10 @@ final class PhoneIntegrationService: ObservableObject {
              "description": "Geri sayım zamanlayıcısı kurar; süre dolunca alarm çalar.",
              "parameters": obj(["minutes": i("Dakika."), "seconds": i("Saniye (opsiyonel)."), "label": s("Etiket (opsiyonel, örn: 'Makarna').")])],
             ["name": "listAlarms",
-             "description": "Gismo'nun kurduğu aktif alarm ve zamanlayıcıları listeler.",
+             "description": "Milo'nun kurduğu aktif alarm ve zamanlayıcıları listeler.",
              "parameters": obj([:])],
             ["name": "cancelAlarm",
-             "description": "Gismo'nun kurduğu alarm/zamanlayıcıyı iptal eder.",
+             "description": "Milo'nun kurduğu alarm/zamanlayıcıyı iptal eder.",
              "parameters": obj(["query": s("Etiket, saat ('07:30') veya hepsi için 'hepsi'.")], ["query"])],
             ["name": "getHealthData",
              "description": "Apple Sağlık verilerini okur.",
@@ -427,7 +427,7 @@ final class PhoneIntegrationService: ObservableObject {
     Mesajlar (sendPhoneMessage, sendWhatsAppMessage), Cihaz (getDeviceStatus, setFlashlight, setScreenBrightness), tarih/saat (getDateTime).
     Arama yapmadan ve mesaj taslağı açmadan önce alıcıyı ve mesajı tekrar edip onay iste.
     iOS KISITI: Gelen SMS'leri okumak, arama geçmişini (gelen/cevapsız aramalar) görmek ve Saat uygulamasındaki mevcut alarmları görmek Apple tarafından hiçbir uygulamaya izin verilmez. \
-    Kullanıcı bunları sorarsa kibarca iOS'un buna izin vermediğini söyle ve yapabileceğin alternatifi öner (ör. şu anki arama durumu, Gismo'nun kurduğu alarmlar).
+    Kullanıcı bunları sorarsa kibarca iOS'un buna izin vermediğini söyle ve yapabileceğin alternatifi öner (ör. şu anki arama durumu, Milo'nun kurduğu alarmlar).
     Bir araç "kapalı" veya "izin verilmedi" derse kullanıcıya Entegrasyonlar > Telefon bölümünden açabileceğini söyle.
     """
 
@@ -740,7 +740,7 @@ final class PhoneIntegrationService: ObservableObject {
         let title = str(args["title"])
         guard let start = Self.parseDate(str(args["startDate"])) else { return "Etkinlik tarihi anlaşılamadı." }
         let event = EKEvent(eventStore: eventStore)
-        event.title = title.isEmpty ? "Gismo etkinliği" : title
+        event.title = title.isEmpty ? "Milo etkinliği" : title
         event.startDate = start
         event.endDate = start.addingTimeInterval(Double(max(5, int(args["durationMinutes"]) ?? 60)) * 60)
         let loc = str(args["location"]); if !loc.isEmpty { event.location = loc }
@@ -774,7 +774,7 @@ final class PhoneIntegrationService: ObservableObject {
     private func createReminder(_ args: [String: Any]) async -> String {
         if let msg = await ensureReady(.reminders) { return msg }
         let reminder = EKReminder(eventStore: eventStore)
-        reminder.title = str(args["title"]).isEmpty ? "Gismo hatırlatıcısı" : str(args["title"])
+        reminder.title = str(args["title"]).isEmpty ? "Milo hatırlatıcısı" : str(args["title"])
         guard let calendar = eventStore.defaultCalendarForNewReminders() else { return "Anımsatıcılar listesi bulunamadı." }
         reminder.calendar = calendar
         let notes = str(args["notes"]); if !notes.isEmpty { reminder.notes = notes }
@@ -825,7 +825,7 @@ final class PhoneIntegrationService: ObservableObject {
         }
         #endif
         let content = UNMutableNotificationContent()
-        content.title = isTimer ? "⏱ Zamanlayıcı bitti" : "⏰ Gismo Alarmı"
+        content.title = isTimer ? "⏱ Zamanlayıcı bitti" : "⏰ Milo Alarmı"
         content.body = label
         content.sound = .defaultCritical
         content.interruptionLevel = .timeSensitive
@@ -885,7 +885,7 @@ final class PhoneIntegrationService: ObservableObject {
         #endif
         storedAlarms = list
         guard !list.isEmpty else {
-            return "Gismo'nun kurduğu aktif alarm veya zamanlayıcı yok. (Saat uygulamasındaki alarmları iOS paylaşmaz.)"
+            return "Milo'nun kurduğu aktif alarm veya zamanlayıcı yok. (Saat uygulamasındaki alarmları iOS paylaşmaz.)"
         }
         return list.sorted { $0.date < $1.date }.map {
             "• \($0.isTimer ? "Zamanlayıcı" : "Alarm") \(Self.format($0.date, "d MMM EEEE HH:mm")) — \($0.label)"
@@ -901,7 +901,7 @@ final class PhoneIntegrationService: ObservableObject {
         } else {
             targets = all.filter { Self.fold($0.label).contains(q) || Self.format($0.date, "HH:mm") == query.replacingOccurrences(of: ".", with: ":") }
         }
-        guard !targets.isEmpty else { return "'\(query)' ile eşleşen Gismo alarmı bulunamadı." }
+        guard !targets.isEmpty else { return "'\(query)' ile eşleşen Milo alarmı bulunamadı." }
         for a in targets {
             #if canImport(AlarmKit)
             if #available(iOS 26.0, *) { GismoAlarmKit.cancel(a.id) }
@@ -995,7 +995,7 @@ final class PhoneIntegrationService: ObservableObject {
         let span = max(1, min(days, 90))
         let start = cal.date(byAdding: .day, value: -(span - 1), to: cal.startOfDay(for: end)) ?? end
         let period = span == 1 ? "Bugün" : "Son \(span) gün"
-        let noData = "\(period) için bu veriye Sağlık uygulamasında kayıt yok (veya Gismo'ya okuma izni verilmemiş — Sağlık > Paylaşım > Uygulamalar > Gismo)."
+        let noData = "\(period) için bu veriye Sağlık uygulamasında kayıt yok (veya Milo'ya okuma izni verilmemiş — Sağlık > Paylaşım > Uygulamalar > Milo)."
         let perMinute = HKUnit.count().unitDivided(by: .minute())
 
         func n(_ v: Double, _ digits: Int = 0) -> String { String(format: "%.\(digits)f", v) }

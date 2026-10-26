@@ -604,7 +604,7 @@ final class GooglePhotosService {
     }
 
     /// Kameradan çekilen veya verilen fotoğrafı Google Photos'a yükler (ve yedek olarak Google Drive'a da kaydeder)
-    func uploadPhoto(data: Data, fileName: String, description: String = "Gismo Robot ile çekildi") async throws -> String {
+    func uploadPhoto(data: Data, fileName: String, description: String = "Milo Robot ile çekildi") async throws -> String {
         let token = try await getValidAccessToken()
         let cleanName = fileName.lowercased().hasSuffix(".jpg") || fileName.lowercased().hasSuffix(".jpeg")
             ? fileName
