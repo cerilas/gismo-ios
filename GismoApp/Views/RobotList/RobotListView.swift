@@ -9,6 +9,8 @@ struct RobotListView: View {
     @State private var headerAppeared = false
     @State private var robotPendingDeletion: Robot?
     @State private var robotPendingModeSelection: Robot?
+    @State private var robotPendingRename: Robot?
+    @State private var renameInputText: String = ""
     @State private var selectedFaceRobot: Robot?
     @State private var showIntegrations = false
     @State private var showUserProfile = false
@@ -44,6 +46,12 @@ struct RobotListView: View {
                 modeSelectionOverlay(for: robot)
                     .transition(.opacity.combined(with: .scale(scale: 0.95)))
                     .zIndex(10)
+            }
+
+            if let robot = robotPendingRename {
+                robotRenameOverlay(for: robot)
+                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                    .zIndex(20)
             }
         }
         .fullScreenCover(isPresented: $showSetup) {
@@ -391,6 +399,9 @@ struct RobotListView: View {
                     onSelectControl: {
                         selectedRobot = robot
                     },
+                    onRename: {
+                        openRenameModal(for: robot)
+                    },
                     onCardTap: {
                         if robot.isOnline || isTestModeEnabled {
                             withAnimation(.spring(response: 0.34, dampingFraction: 0.86)) {
@@ -409,6 +420,13 @@ struct RobotListView: View {
                     } label: {
                         Label("Sil", systemImage: "trash")
                     }
+
+                    Button {
+                        openRenameModal(for: robot)
+                    } label: {
+                        Label("İsmi Değiştir", systemImage: "pencil")
+                    }
+                    .tint(.gAccent2)
                 }
                 .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20))
                 .listRowSeparator(.hidden)
@@ -460,10 +478,28 @@ struct RobotListView: View {
                     }
 
                     VStack(alignment: .leading, spacing: 5) {
-                        Text(robot.name)
-                            .font(.system(size: 22, weight: .black, design: .rounded))
-                            .foregroundColor(.white)
-                            .lineLimit(1)
+                        HStack(spacing: 8) {
+                            Text(robot.name)
+                                .font(.system(size: 22, weight: .black, design: .rounded))
+                                .foregroundColor(.white)
+                                .lineLimit(1)
+
+                            Button {
+                                dismissModeSelection()
+                                openRenameModal(for: robot)
+                            } label: {
+                                Image(systemName: "pencil")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundColor(.gCyan)
+                                    .frame(width: 26, height: 26)
+                                    .background(
+                                        Circle()
+                                            .fill(Color.gCyan.opacity(0.15))
+                                            .overlay(Circle().stroke(Color.gCyan.opacity(0.35), lineWidth: 1))
+                                    )
+                            }
+                            .buttonStyle(ScaleButtonStyle())
+                        }
 
                         Text("Çalışma modunu seçin")
                             .font(.system(size: 13, weight: .medium))
@@ -604,6 +640,213 @@ struct RobotListView: View {
     private func dismissModeSelection() {
         withAnimation(.spring(response: 0.28, dampingFraction: 0.9)) {
             robotPendingModeSelection = nil
+        }
+    }
+
+    // MARK: - Robot Rename Modal
+
+    private func openRenameModal(for robot: Robot) {
+        renameInputText = robot.name
+        withAnimation(.spring(response: 0.34, dampingFraction: 0.86)) {
+            robotPendingRename = robot
+        }
+    }
+
+    private func dismissRenameModal() {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        withAnimation(.spring(response: 0.28, dampingFraction: 0.9)) {
+            robotPendingRename = nil
+        }
+    }
+
+    private func saveRenamedRobot(_ robot: Robot) {
+        let clean = renameInputText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty else { return }
+        viewModel.renameRobot(robot, to: clean)
+        dismissRenameModal()
+    }
+
+    private func robotRenameOverlay(for robot: Robot) -> some View {
+        let suggestions = ["Nova", "Atlas", "Milo", "Badi", "Cuma"]
+        let isCleanEmpty = renameInputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+
+        return ZStack {
+            Color.black.opacity(0.72)
+                .ignoresSafeArea()
+                .onTapGesture {
+                    dismissRenameModal()
+                }
+
+            VStack(spacing: 18) {
+                HStack(spacing: 12) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .fill(LinearGradient.accent)
+                            .frame(width: 48, height: 48)
+                            .shadow(color: Color.gAccent.opacity(0.4), radius: 10, x: 0, y: 4)
+
+                        HStack(spacing: 5) {
+                            RoundedRectangle(cornerRadius: 2.5)
+                                .fill(Color.white)
+                                .frame(width: 7, height: 12)
+                            RoundedRectangle(cornerRadius: 2.5)
+                                .fill(Color.white)
+                                .frame(width: 7, height: 12)
+                        }
+                    }
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Robot İsmini Değiştir")
+                            .font(.system(size: 18, weight: .black, design: .rounded))
+                            .foregroundColor(.white)
+                        Text("Yeni isim listede görünür ve robotun kendi adını bilmesini sağlar.")
+                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                            .foregroundColor(.gSubtext)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    Spacer(minLength: 0)
+
+                    Button {
+                        dismissRenameModal()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(.gSubtext)
+                            .frame(width: 32, height: 32)
+                            .background(
+                                Circle()
+                                    .fill(Color.gSurface2)
+                                    .overlay(Circle().stroke(Color.white.opacity(0.08), lineWidth: 1))
+                            )
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+                }
+
+                // Name Input Field
+                HStack(spacing: 10) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.gCyan)
+
+                    TextField("Örn: Nova, Atlas, Badi...", text: $renameInputText)
+                        .textInputAutocapitalization(.words)
+                        .autocorrectionDisabled(true)
+                        .submitLabel(.done)
+                        .onSubmit {
+                            saveRenamedRobot(robot)
+                        }
+                        .font(.system(size: 17, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+
+                    if !renameInputText.isEmpty {
+                        Button {
+                            renameInputText = ""
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 15))
+                                .foregroundColor(.gSubtext)
+                        }
+                    }
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 13)
+                .background(
+                    RoundedRectangle(cornerRadius: 15, style: .continuous)
+                        .fill(Color.gBg.opacity(0.9))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 15, style: .continuous)
+                                .stroke(Color.gCyan.opacity(0.45), lineWidth: 1.3)
+                        )
+                )
+
+                // Quick Suggestions
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(suggestions, id: \.self) { suggestion in
+                            let selected = renameInputText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == suggestion.lowercased()
+                            Button {
+                                renameInputText = suggestion
+                            } label: {
+                                Text(suggestion)
+                                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                                    .foregroundColor(selected ? .black : .gSubtext)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background(
+                                        Capsule()
+                                            .fill(selected ? Color.gCyan : Color.gSurface2)
+                                            .overlay(
+                                                Capsule()
+                                                    .stroke(selected ? Color.clear : Color.gBorder, lineWidth: 1)
+                                            )
+                                    )
+                            }
+                        }
+                    }
+                }
+
+                // Action Buttons
+                HStack(spacing: 10) {
+                    Button {
+                        dismissRenameModal()
+                    } label: {
+                        Text("Vazgeç")
+                            .font(.system(size: 14, weight: .bold, design: .rounded))
+                            .foregroundColor(.gSubtext)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 13)
+                            .background(
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .fill(Color.gSurface2)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                            .stroke(Color.gBorder, lineWidth: 1)
+                                    )
+                            )
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+
+                    Button {
+                        saveRenamedRobot(robot)
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "checkmark.seal.fill")
+                                .font(.system(size: 14, weight: .bold))
+                            Text("İsmi Kaydet")
+                                .font(.system(size: 14, weight: .bold, design: .rounded))
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 13)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .fill(LinearGradient.accent)
+                                .opacity(isCleanEmpty ? 0.45 : 1.0)
+                                .shadow(color: Color.gAccent.opacity(0.35), radius: 10, x: 0, y: 4)
+                        )
+                    }
+                    .disabled(isCleanEmpty)
+                    .buttonStyle(ScaleButtonStyle())
+                }
+            }
+            .padding(22)
+            .background(
+                RoundedRectangle(cornerRadius: 26, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.gSurface2.opacity(0.97), Color.gSurface.opacity(0.99)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 26, style: .continuous)
+                    .stroke(LinearGradient.glassBorder, lineWidth: 1.2)
+            )
+            .shadow(color: .black.opacity(0.55), radius: 30, x: 0, y: 16)
+            .padding(.horizontal, 22)
         }
     }
 
@@ -752,6 +995,7 @@ struct RobotCard: View {
     var isInteractive: Bool = true
     var onSelectFace: (() -> Void)? = nil
     var onSelectControl: (() -> Void)? = nil
+    var onRename: (() -> Void)? = nil
     var onCardTap: (() -> Void)? = nil
 
     @State private var appeared = false
@@ -815,6 +1059,29 @@ struct RobotCard: View {
                             .font(.system(size: 19, weight: .black, design: .rounded))
                             .foregroundColor(.white)
                             .lineLimit(1)
+
+                        Button {
+                            onRename?()
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "pencil")
+                                    .font(.system(size: 10, weight: .bold))
+                                Text("İsim")
+                                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                            }
+                            .foregroundColor(.gCyan)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(
+                                Capsule()
+                                    .fill(Color.gCyan.opacity(0.14))
+                                    .overlay(
+                                        Capsule()
+                                            .stroke(Color.gCyan.opacity(0.35), lineWidth: 1)
+                                    )
+                            )
+                        }
+                        .buttonStyle(ScaleButtonStyle())
 
                         Spacer(minLength: 0)
 

@@ -44,40 +44,59 @@ class RobotListViewModel: ObservableObject {
         }
     }
 
+    private func perRobotNameKey(for robotId: UUID) -> String {
+        let uid = AuthService.shared.currentUser?.id ?? "guest"
+        return "user_robot_name_\(uid)_\(robotId.uuidString.lowercased())"
+    }
+
     private func applyUserRobotName(to rawList: [Robot], forceSyncToServer: Bool = false) -> [Robot] {
         let customName = AuthService.shared.customRobotName.trimmingCharacters(in: .whitespacesAndNewlines)
         var list = rawList
 
-        if !customName.isEmpty {
-            for idx in list.indices {
-                let current = list[idx].name.trimmingCharacters(in: .whitespacesAndNewlines)
-                let isDefaultName = current.isEmpty
-                    || current.lowercased().hasPrefix("gismo")
-                    || current.lowercased() == "robot"
-                if idx == 0 || isDefaultName {
-                    if list[idx].name != customName {
-                        list[idx].name = customName
-                        let updated = list[idx]
-                        if updated.id != Self.demoRobotID {
-                            Task {
-                                try? await DatabaseService.shared.registerRobot(updated)
-                            }
-                        }
-                    } else if forceSyncToServer && list[idx].id != Self.demoRobotID {
-                        let updated = list[idx]
+        for idx in list.indices {
+            let robotId = list[idx].id
+            let savedPerRobot = (UserDefaults.standard.string(forKey: perRobotNameKey(for: robotId)) ?? "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let current = list[idx].name.trimmingCharacters(in: .whitespacesAndNewlines)
+            let isDefaultName = current.isEmpty
+                || current.lowercased().hasPrefix("gismo")
+                || current.lowercased() == "robot"
+
+            let targetName: String? = {
+                if !savedPerRobot.isEmpty {
+                    return savedPerRobot
+                }
+                if !customName.isEmpty && (idx == 0 || isDefaultName) {
+                    return customName
+                }
+                return nil
+            }()
+
+            if let targetName, !targetName.isEmpty {
+                if list[idx].name != targetName {
+                    list[idx].name = targetName
+                    let updated = list[idx]
+                    if updated.id != Self.demoRobotID {
                         Task {
                             try? await DatabaseService.shared.registerRobot(updated)
                         }
+                    }
+                } else if forceSyncToServer && list[idx].id != Self.demoRobotID {
+                    let updated = list[idx]
+                    Task {
+                        try? await DatabaseService.shared.registerRobot(updated)
                     }
                 }
             }
         }
 
         if list.isEmpty && UserDefaults.standard.bool(forKey: "isTestModeEnabled") {
+            let demoName = (UserDefaults.standard.string(forKey: perRobotNameKey(for: Self.demoRobotID)) ?? "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
             list = [
                 Robot(
                     id: Self.demoRobotID,
-                    name: AuthService.shared.effectiveRobotName,
+                    name: demoName.isEmpty ? AuthService.shared.effectiveRobotName : demoName,
                     ipAddress: "192.168.4.1",
                     lastSeen: Date(),
                     isOnline: true
@@ -86,6 +105,28 @@ class RobotListViewModel: ObservableObject {
         }
 
         return list
+    }
+
+    func renameRobot(_ robot: Robot, to rawName: String) {
+        let cleanName = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanName.isEmpty else { return }
+
+        UserDefaults.standard.set(cleanName, forKey: perRobotNameKey(for: robot.id))
+        AuthService.shared.saveCustomRobotName(cleanName)
+
+        if let index = robots.firstIndex(where: { $0.id == robot.id }) {
+            robots[index].name = cleanName
+            let updated = robots[index]
+            if updated.id != Self.demoRobotID {
+                Task {
+                    do {
+                        try await DatabaseService.shared.registerRobot(updated)
+                    } catch {
+                        print("Robot isim güncelleme hatası: \(error)")
+                    }
+                }
+            }
+        }
     }
 
     func loadRobots() async {
