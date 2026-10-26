@@ -59,8 +59,11 @@ final class GismoFaceViewModel: ObservableObject {
     private var robotNotificationCancellable: AnyCancellable?
     private var isFaceModeActive: Bool = false
     private var seenMailIds: Set<String> = []
+    private var pendingIncomingEmails: [GmailIncomingEmail] = []
     private var mailMonitorStartMs: Int64 = 0
     private var hasBaselineMailSnapshot: Bool = false
+    private var lastConversationActivityAt: Date = .distantPast
+    private var isAwaitingUserFollowUp: Bool = false
 
     init(robot: Robot) {
         self.robot = robot
@@ -420,24 +423,33 @@ final class GismoFaceViewModel: ObservableObject {
                             self.hasBaselineMailSnapshot = true
                             print("[MailMonitor] Başlangıç kutusu kaydedildi (\(initialIds.count) mail). Yeni mailler bekleniyor...")
                         }
-                    } else if !self.isThinking && !self.isSpeaking && self.voiceEngine.liveTranscript.isEmpty {
+                    } else {
+                        // Konuşma esnasında da yeni mailleri arka planda kuyruğa al, ancak SADECE konuşma tamamen bittiğinde seslendir
                         if let newMail = try? await GmailService.shared.checkForNewIncomingEmail(
                             seenIds: self.seenMailIds,
                             sinceMs: self.mailMonitorStartMs
                         ) {
                             self.seenMailIds.insert(newMail.id)
-                            print("[MailMonitor] Yeni mail yakalandı: \(newMail.senderName) - \(newMail.subject)")
-                            await self.announceIncomingEmail(newMail)
+                            if !self.pendingIncomingEmails.contains(where: { $0.id == newMail.id }) {
+                                self.pendingIncomingEmails.append(newMail)
+                            }
+                            print("[MailMonitor] Yeni mail kuyruğa alındı: \(newMail.senderName) - \(newMail.subject)")
+                        }
+
+                        if self.isSafeToAnnounceIncomingEmail, !self.pendingIncomingEmails.isEmpty {
+                            let nextMail = self.pendingIncomingEmails.removeFirst()
+                            await self.announceIncomingEmail(nextMail)
                         }
                     }
                 } else if !gmailConnected || !notificationsEnabled {
                     self.hasBaselineMailSnapshot = false
+                    self.pendingIncomingEmails.removeAll()
                     if !gmailConnected {
                         self.seenMailIds.removeAll()
                     }
                 }
 
-                try? await Task.sleep(for: .seconds(10))
+                try? await Task.sleep(for: .seconds(5))
             }
         }
     }
@@ -447,14 +459,36 @@ final class GismoFaceViewModel: ObservableObject {
         incomingMailTask = nil
     }
 
+    /// Kullanıcı veya robot konuşurken, düşünürken, manuel giriş kutusu açıkken veya soru-cevap bekleme süresindeyken mail anonsu ARAYA GİRMEZ.
+    private var isSafeToAnnounceIncomingEmail: Bool {
+        guard isFaceModeActive && isRobotBodyOnline else { return false }
+        guard !isThinking && !isSpeaking else { return false }
+        guard activeManualInputPrompt == nil else { return false }
+        guard voiceEngine.liveTranscript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+        guard liveTranscript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+
+        // Son konuşma/etkileşim üzerinden güvenli bekleme süresi (soru sorulduysa 16 sn, normal konuşma bittiyse 8 sn sessizlik)
+        let requiredSilence: TimeInterval = isAwaitingUserFollowUp ? 16.0 : 8.0
+        let elapsedSinceLastActivity = Date().timeIntervalSince(lastConversationActivityAt)
+        return elapsedSinceLastActivity >= requiredSilence
+    }
+
     /// Yeni gelen e-postayı doğal ve çok kısa bir şekilde seslendirip özetler, ardından kullanıcının aksiyon almasını ("yanıtla", "bir şey yapma" vb.) sağlar.
     private func announceIncomingEmail(_ mail: GmailIncomingEmail) async {
-        guard isFaceModeActive && !isThinking && !isSpeaking else { return }
+        guard isSafeToAnnounceIncomingEmail else {
+            // O sırada kullanıcı konuşmaya başladıysa maili kaybetme, kuyruğun başına geri koy
+            if !pendingIncomingEmails.contains(where: { $0.id == mail.id }) {
+                pendingIncomingEmails.insert(mail, at: 0)
+            }
+            return
+        }
 
         gemini.lastIncomingEmail = mail
         isThinking = true
         showResponse = false
         liveTranscript = ""
+        lastConversationActivityAt = Date()
+        isAwaitingUserFollowUp = true
 
         voiceEngine.pauseForSpeech()
 
@@ -594,6 +628,10 @@ final class GismoFaceViewModel: ObservableObject {
                 self.liveTranscript = newText
                 self.isListening = voiceEngine.isListening
 
+                if !newText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    self.lastConversationActivityAt = Date()
+                }
+
                 // Transkript boşken dolmaya başladı → listening animasyonu
                 if wasEmpty && !newText.isEmpty && !isThinking {
                     setEmotion(.listening, for: 0)
@@ -614,6 +652,8 @@ final class GismoFaceViewModel: ObservableObject {
         guard isRobotBodyOnline && !isThinking && !isSpeaking else { return }
 
         isThinking = true
+        lastConversationActivityAt = Date()
+        isAwaitingUserFollowUp = false
         didCapturePhotoInCurrentTurn = false
         showResponse = false
         liveTranscript = ""
@@ -796,6 +836,8 @@ final class GismoFaceViewModel: ObservableObject {
         isThinking = false
         isSpeaking = false
         speechLevel = 0.0
+        lastConversationActivityAt = Date()
+        isAwaitingUserFollowUp = displayText.contains("?")
         scheduleHideResponse(after: 2.5)
 
         try? await Task.sleep(for: .milliseconds(250))
@@ -816,6 +858,8 @@ final class GismoFaceViewModel: ObservableObject {
         guard !trimmed.isEmpty else {
             isThinking = false
             aiResponse = displayText
+            lastConversationActivityAt = Date()
+            isAwaitingUserFollowUp = displayText.contains("?")
             setEmotion(emotion, for: max(minDisplaySeconds, 5.0))
             showResponse = true
             executeMotorSequence(motorSteps)
@@ -854,6 +898,8 @@ final class GismoFaceViewModel: ObservableObject {
         isThinking = false
         isSpeaking = false
         speechLevel = 0.0
+        lastConversationActivityAt = Date()
+        isAwaitingUserFollowUp = displayText.contains("?")
         scheduleHideResponse(after: 2.5)
 
         // Yankı oluşmaması için kısa bir nefes payı bırakıp mikrofonu tekrar aç
